@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@theme inline {
+  --font-sans: var(--font-geist), sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+:root { color-scheme: light; --background: oklch(0.98 0.012 90); --foreground: oklch(0.22 0.025 145); --card: oklch(1 0 0); --primary: oklch(0.27 0.045 145); --primary-foreground: oklch(0.98 0.012 90); --secondary: oklch(0.94 0.025 90); --muted: oklch(0.95 0.018 90); --muted-foreground: oklch(0.48 0.025 145); --accent: oklch(0.82 0.12 82); --accent-foreground: oklch(0.28 0.05 80); --border: oklch(0.88 0.025 90); --input: oklch(0.88 0.025 90); --ring: oklch(0.55 0.08 145); }
+* { border-color: var(--border); }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-geist), sans-serif; }
+button, a { transition: all 160ms ease; }
+
+/* Leaflet map integration */
+.leaflet-container { z-index: 0; font-family: var(--font-geist), sans-serif; background: var(--muted); }
+.leaflet-popup-content-wrapper { border-radius: 12px; }
+.leaflet-control-attribution { font-size: 10px; }
+.oliv-pin { background: none; border: none; }
+.oliv-pin-dot { display: block; width: 22px; height: 22px; border-radius: 9999px; border: 2px solid var(--card); box-shadow: 0 2px 8px rgb(0 0 0 / 0.35); }
+.oliv-pin-primary { background: var(--primary); }
+.oliv-pin-accent { background: var(--accent); }

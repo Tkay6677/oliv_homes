@@ -1,0 +1,17 @@
+▲ Next.js 16.3.3
+- Local:         http://localhost:3001
+- Network:       http://192.168.56.1:3001
+✓ Ready in 466ms
+✓ Running next.config.mjs took 53ms
+⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async n (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:1632)
+    at async Z (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:5834)
+⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async n (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:1632)
+    at async Z (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:5834)
+⨯ SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)
+    at JSON.parse (<anonymous>)
+    at async n (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:1632)
+    at async Z (C:\Users\ebito\OneDrive\Documents\oliv-homes\.next\server\chunks\[root-of-the-server]__0moalzh._.js:1:5834)

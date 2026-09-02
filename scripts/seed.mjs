@@ -1,0 +1,15 @@
+import { MongoClient } from 'mongodb'
+import { createHash, randomBytes } from 'node:crypto'
+const uri = process.env.MONGODB_URI
+if (!uri) throw new Error('MONGODB_URI is required')
+const client = new MongoClient(uri)
+const digest = (password) => { const salt = randomBytes(16).toString('hex'); return `${salt}:${createHash('sha256').update(`${salt}:${password}`).digest('hex')}` }
+const now = new Date()
+await client.connect(); const db = client.db(process.env.MONGODB_DB ?? 'oliv_homes')
+const users = [{ name: 'Ada Okoro', email: 'user@olivhomes.ng', phone: '+234 801 000 0001', password: digest('OlivUser2026!'), role: 'USER' }, { name: 'Chidi Ebi', email: 'agent@olivhomes.ng', phone: '+234 803 000 0002', password: digest('OlivAgent2026!'), role: 'AGENT', agentVerificationStatus: 'VERIFIED', agentVerificationLevel: 3, agentCompanyName: 'Ebi Homes', agentLicenseNumber: 'BAY-AG-003' }, { name: 'OLIV Admin', email: 'admin@olivhomes.ng', phone: '+234 805 000 0003', password: digest('OlivAdmin2026!'), role: 'SUPER_ADMIN', agentVerificationStatus: 'VERIFIED', agentVerificationLevel: 3 }]
+await db.collection('users').bulkWrite(users.map((user) => ({ updateOne: { filter: { email: user.email }, update: { $set: { ...user, updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } })))
+const agent = await db.collection('users').findOne({ email: 'agent@olivhomes.ng' })
+const properties = [{ slug: 'sabina-yenagoa', agentId: agent?._id?.toString() ?? 'seed-agent', title: 'Sabina Apartments', description: 'Bright, secure apartment close to central Yenagoa.', type: 'apartment', price: 1250000, currency: 'NGN', location: { address: '201 Grand Key Loop East', city: 'Yenagoa', postalCode: '560001', country: 'Nigeria', coordinates: { lat: 4.9267, lng: 6.2676 } }, bedrooms: 3, bathrooms: 3, squareMeters: 185, furnished: true, amenities: ['24/7 security', 'Parking', 'Water supply'], images: ['https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=85'], verificationBadge: true, published: true }, { slug: 'trans-amadi-terrace', agentId: agent?._id?.toString() ?? 'seed-agent', title: 'Trans-Amadi Terrace', description: 'Contemporary family home in a gated neighbourhood.', type: 'house', price: 85000000, currency: 'NGN', location: { address: '14 Stadium Road Extension', city: 'Port Harcourt', postalCode: '500001', country: 'Nigeria', coordinates: { lat: 4.8156, lng: 7.0498 } }, bedrooms: 4, bathrooms: 4, squareMeters: 260, furnished: false, amenities: ['Gated estate', 'Generator', 'Family lounge'], images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=85'], verificationBadge: true, published: true }]
+await db.collection('properties').bulkWrite(properties.map((property) => ({ updateOne: { filter: { slug: property.slug }, update: { $set: { ...property, updatedAt: now }, $setOnInsert: { createdAt: now } }, upsert: true } })))
+console.log(`Seeded ${users.length} roles and ${properties.length} Nigerian listings into ${db.databaseName}.`)
+await client.close()
