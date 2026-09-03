@@ -15,7 +15,7 @@ export const parsePage = (value: unknown) => {
 
 export const parseLimit = (value: unknown) => {
   const limit = Number(value)
-  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, 48) : 12
+  return Number.isInteger(limit) && limit > 0 ? Math.min(limit, 200) : 12
 }
 
 export const ok = (data: Record<string, unknown>, status = 200) => Response.json({ success: true, ...data }, { status })

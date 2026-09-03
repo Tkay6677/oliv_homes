@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     const locationBody = (body.location ?? {}) as Record<string, unknown>
     const address = asText(locationBody.address, 200)
     const city = asText(locationBody.city, 60)
+    const state = asText(locationBody.state, 60)
     const postalCode = asText(locationBody.postalCode, 12)
     const coordinateBody = (locationBody.coordinates ?? null) as Record<string, unknown> | null
     const lat = coordinateBody ? Number(coordinateBody.lat) : NaN
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     const coordinates = Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180 ? { lat, lng } : undefined
     const property = await createAgentProperty(user._id!.toString(), {
       title, description, type, price,
-      location: { address, city, postalCode, country: 'Nigeria', ...(coordinates ? { coordinates } : {}) },
+      location: { address, city, ...(state ? { state } : {}), postalCode, country: 'Nigeria', ...(coordinates ? { coordinates } : {}) },
       bedrooms, bathrooms, squareMeters, furnished: Boolean(body.furnished), amenities, images,
       published: body.published === false ? false : true,
     })

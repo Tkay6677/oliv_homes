@@ -108,6 +108,72 @@ const main = async () => {
   const publicListings = await call('/api/properties')
   check('published listing visible on public discover API', (publicListings.json.items ?? []).some((item) => item.title === 'E2E Map-Pinned Apartment'), `status ${publicListings.status} count=${(publicListings.json.items ?? []).length}`)
 
+  // --- Notifications: admins get notified of new applications + listings ---
+  const adminNotifs = await call('/api/notifications', { cookieKey: 'admin' })
+  const adminNotificationTypes = (adminNotifs.json.items ?? []).map((item) => item.type)
+  check('admin notified about new agent application', adminNotificationTypes.includes('AGENT_APPLICATION'), `types=${adminNotificationTypes.join(',')}`)
+  check('admin notified about newly published listing', adminNotificationTypes.includes('LISTING_PUBLISHED'), `types=${adminNotificationTypes.join(',')}`)
+  check('admin notification has unread count', adminNotifs.json.unread >= 2, `unread=${adminNotifs.json.unread}`)
+
+  // --- Review persistence (from refresh) ---
+  await call('/api/auth', { method: 'POST', cookieKey: 'renter', body: { action: 'signup', name: 'Renter User', email: `e2e-renter-${stamp}@olivtest.ng`, password: 'Renter2026!' } })
+  const review = await call('/api/reviews', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, rating: 5, text: 'E2E review — excellent location and very responsive agent.' } })
+  check('review submission saved to database', review.status === 201 && review.json.review?.status === 'PUBLISHED', `status ${review.status} ${JSON.stringify(review.json).slice(0, 140)}`)
+  const reloadedReviews = await call(`/api/reviews?propertyId=${listing.json.property?._id}`)
+  check('review reloads from database', (reloadedReviews.json.items ?? []).some((item) => item.text?.includes('E2E review')), `count=${(reloadedReviews.json.items ?? []).length}`)
+  const globalReviews = await call('/api/reviews')
+  check('review visible in global store (survives refresh)', (globalReviews.json.items ?? []).some((item) => item.text?.includes('E2E review')), `count=${(globalReviews.json.items ?? []).length}`)
+  // Agent should now have a REVIEW_RECEIVED notification (review was from a different user).
+  const agentNotifsAfterReview = await call('/api/notifications')
+  const reviewNotification = (agentNotifsAfterReview.json.items ?? []).find((item) => item.type === 'REVIEW_RECEIVED')
+  check('agent notified about new review', Boolean(reviewNotification) && (reviewNotification.title ?? '').includes('review'), `type=${reviewNotification?.type} title=${reviewNotification?.title}`)
+  check('agent notification unread badge reflects count', agentNotifsAfterReview.json.unread >= 1, `unread=${agentNotifsAfterReview.json.unread}`)
+
+  // --- Agent dashboard inbox + responding ---
+  const requestForListing = await call('/api/requests', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, type: 'VIEWING', preferredDate: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(), preferredTime: 'Afternoon' } })
+  check('renter booking request created', requestForListing.status === 200, `status ${requestForListing.status} ${JSON.stringify(requestForListing.json)}`)
+  const agentNotifsAfterBooking = await call('/api/notifications')
+  check('agent notified about new viewing request', (agentNotifsAfterBooking.json.items ?? []).some((item) => item.type === 'VIEWING_REQUEST'), `types=${(agentNotifsAfterBooking.json.items ?? []).map((item) => item.type).join(',')}`)
+  const inboxAfter = await call('/api/agent/requests')
+  const inboxItem = (inboxAfter.json.items ?? []).find((item) => item.propertyId === listing.json.property?._id && item.type === 'VIEWING')
+  check('agent sees the booking with property + renter info', Boolean(inboxItem) && Boolean(inboxItem.userName) && Boolean(inboxItem.propertyTitle), `title=${inboxItem?.propertyTitle} user=${inboxItem?.userName}`)
+  const confirm = await call('/api/agent/requests', { method: 'PATCH', body: { requestId: inboxItem?._id ?? '', action: 'CONFIRM' } })
+  check('agent confirms the viewing', confirm.status === 200 && confirm.json.request?.status === 'CONFIRMED', `status ${confirm.status} ${JSON.stringify(confirm.json).slice(0, 120)}`)
+  const renterNotifsAfterConfirm = await call('/api/notifications', { cookieKey: 'renter' })
+  check('renter notified when viewing is confirmed', (renterNotifsAfterConfirm.json.items ?? []).some((item) => item.type === 'VIEWING_CONFIRMED'), `types=${(renterNotifsAfterConfirm.json.items ?? []).map((item) => item.type).join(',')}`)
+  const strangerReject = await call('/api/agent/requests', { method: 'PATCH', cookieKey: 'renter', body: { requestId: inboxItem?._id ?? '', action: 'CANCEL' } })
+  check('non-agent cannot update a request', strangerReject.status === 403, `status ${strangerReject.status}`)
+
+  // --- Inquiry reply flow notifies the renter ---
+  const inquiry = await call('/api/requests', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, type: 'INQUIRY', message: 'Is this home still available for viewing next week?' } })
+  check('renter inquiry created', inquiry.status === 200, `status ${inquiry.status} ${JSON.stringify(inquiry.json)}`)
+  const inboxWithInquiry = await call('/api/agent/requests')
+  const inquiryItem = (inboxWithInquiry.json.items ?? []).find((item) => item.propertyId === listing.json.property?._id && item.type === 'INQUIRY')
+  check('agent sees the inquiry', Boolean(inquiryItem), `id=${inquiryItem?._id}`)
+  const reply = await call('/api/agent/requests', { method: 'PATCH', body: { requestId: inquiryItem?._id ?? '', action: 'REPLY', reply: 'Yes, it is available. We can arrange a visit.' } })
+  check('agent replies to the inquiry', reply.status === 200 && reply.json.request?.status === 'REPLIED', `status ${reply.status} ${JSON.stringify(reply.json).slice(0, 120)}`)
+  const renterNotifsAfterReply = await call('/api/notifications', { cookieKey: 'renter' })
+  check('renter notified when agent replies', (renterNotifsAfterReply.json.items ?? []).some((item) => item.type === 'INQUIRY_REPLIED'), `types=${(renterNotifsAfterReply.json.items ?? []).map((item) => item.type).join(',')}`)
+
+  // --- Verification outcome notification reaches the agent ---
+  const agentNotifsBeforeMark = await call('/api/notifications')
+  const verificationNotification = (agentNotifsBeforeMark.json.items ?? []).find((item) => item.type === 'VERIFICATION_APPROVED')
+  check('agent notified when verification is approved', Boolean(verificationNotification) && (verificationNotification.body ?? '').includes('approved'), `type=${verificationNotification?.type} body=${verificationNotification?.body}`)
+
+  // --- Mark-notifications-read flow ---
+  const markRead = await call('/api/notifications', { method: 'POST', body: { all: true } })
+  check('mark all read acknowledges', markRead.status === 200 && markRead.json.ok === true, `status ${markRead.status}`)
+  const unreadAfterMark = await call('/api/notifications')
+  check('unread count drops to zero after mark-all-read', unreadAfterMark.json.unread === 0, `unread=${unreadAfterMark.json.unread}`)
+
+  // --- Agent profile settings ---
+  const profileUpdate = await call('/api/agent/profile', { method: 'PATCH', body: { companyName: 'Test Homes Ltd (updated)', bio: 'Updated bio from the E2E settings flow.', statesServed: ['Bayelsa', 'Rivers', 'Lagos'] } })
+  check('agent settings update saved', profileUpdate.status === 200 && (profileUpdate.json.agent?.agentCompanyName ?? '').includes('updated'), `status ${profileUpdate.status}`)
+  const overviewAfter = await call('/api/agent/overview')
+  check('settings reflected in workspace', (overviewAfter.json.agent?.agentCompanyName ?? '').includes('updated') && (overviewAfter.json.agent?.agentStatesServed ?? []).includes('Lagos'))
+  const agentReviews = await call('/api/agent/reviews')
+  check('agent review inbox lists the review', (agentReviews.json.reviews ?? []).some((item) => item.text?.includes('E2E review')), `count=${(agentReviews.json.reviews ?? []).length}`)
+
   const uploadWithoutKeys = await call('/api/upload', { method: 'POST' })
   check('upload endpoint reports config state cleanly', [503, 400].includes(uploadWithoutKeys.status) || uploadWithoutKeys.status === 201, `status ${uploadWithoutKeys.status} error=${uploadWithoutKeys.json.error ?? 'configured'}`)
 

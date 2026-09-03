@@ -1,9 +1,9 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Building2, CalendarDays, Check, Heart, ImagePlus, LogOut, Map, MapPin, Menu, MessageCircle, Plus, Search, ShieldCheck, Star, Trash2, UserCircle, X } from 'lucide-react'
-import { formatNaira, homeImage, nigerianStates } from '@/lib/oliv-data'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Bell, BellDot, Building2, CalendarDays, Check, Heart, ImagePlus, LogOut, Map, MapPin, Menu, MessageCircle, Plus, Search, Settings, ShieldCheck, Star, Trash2, UserCircle, X } from 'lucide-react'
+import { formatNaira, homeImage, nigerianStates, stateForCity } from '@/lib/oliv-data'
 import { useOlivState } from '@/lib/oliv-client-state'
 import type { PickedLocation } from '@/components/oliv-map'
 import type { Property } from '@/lib/types'
@@ -14,9 +14,72 @@ const PropertyListMap = dynamic(() => import('@/components/oliv-map').then((modu
 const PropertyLocationMap = dynamic(() => import('@/components/oliv-map').then((module) => module.PropertyLocationMap), { ssr: false, loading: () => <MapSkeleton /> })
 const MapPicker = dynamic(() => import('@/components/oliv-map').then((module) => module.MapPicker), { ssr: false })
 
-const STATE_CITIES: Record<string, string[]> = { Bayelsa: ['Yenagoa'], Rivers: ['Port Harcourt'], FCT: ['Abuja'], Lagos: ['Lagos', 'Ikeja', 'Lekki'], Edo: ['Benin City'], 'Cross River': ['Calabar'], Delta: ['Asaba', 'Warri'], Oyo: ['Ibadan'], Enugu: ['Enugu'], Kaduna: ['Kaduna'] }
+// State filtering uses lib/oliv-data's full state list + city inference (stateForCity).
 const formatDate = (value?: string | Date | null) => value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
+const formatRelative = (value?: string | Date | null) => {
+  if (!value) return ''
+  const diff = Date.now() - new Date(value).getTime()
+  const minutes = Math.floor(diff / 60_000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days}d ago`
+  return new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
+}
 const STATUS_LABEL: Record<string, string> = { NOT_STARTED: 'Not started', SUBMITTED: 'Submitted for review', UNDER_REVIEW: 'Under review', VERIFIED: 'Verified agent', REJECTED: 'Not approved', SUSPENDED: 'Suspended' }
+
+function NotificationBell() {
+  const { user, notifications, unread, markNotificationRead, markAllNotificationsRead } = useOlivState()
+  const [open, setOpen] = useState(false)
+  const boxRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (!boxRef.current?.contains(event.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+  if (!user) return null
+  const iconFor = (type?: string) => {
+    switch (type) {
+      case 'VIEWING_REQUEST': case 'VIEWING_CONFIRMED': case 'VIEWING_DECLINED': case 'VIEWING_COMPLETED': return <CalendarDays className="size-4 text-primary" />
+      case 'INQUIRY': case 'INQUIRY_REPLIED': return <MessageCircle className="size-4 text-primary" />
+      case 'REVIEW_RECEIVED': return <Star className="size-4 text-accent-foreground" />
+      case 'AGENT_APPLICATION': case 'LISTING_PUBLISHED': return <Building2 className="size-4 text-primary" />
+      case 'VERIFICATION_APPROVED': return <ShieldCheck className="size-4 text-green-600" />
+      case 'VERIFICATION_REJECTED': case 'VERIFICATION_SUSPENDED': return <ShieldCheck className="size-4 text-red-500" />
+      default: return <Bell className="size-4 text-muted-foreground" />
+    }
+  }
+  return (
+    <div className="relative" ref={boxRef}>
+      <button onClick={() => setOpen((value) => !value)} aria-label={open ? 'Close notifications' : 'Open notifications'} aria-expanded={open} className="relative grid size-9 place-items-center rounded-full border border-border bg-card">
+        {unread > 0 ? <BellDot className="size-5" /> : <Bell className="size-5" />}
+        {unread > 0 && <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-primary px-1 py-0.5 text-[10px] font-bold leading-none text-primary-foreground">{unread > 9 ? '9+' : unread}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 z-[600] mt-2 w-80 overflow-hidden rounded-2xl border border-border bg-card shadow-xl sm:w-96">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <p className="font-serif text-lg">Notifications{unread > 0 && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">{unread}</span>}</p>
+            {unread > 0 && <button onClick={() => void markAllNotificationsRead()} className="text-xs font-semibold text-muted-foreground hover:text-foreground">Mark all read</button>}
+          </div>
+          <div className="max-h-80 overflow-y-auto">
+            {notifications.length ? notifications.slice(0, 30).map((item) => (
+              <a key={item._id} href={item.link || '/profile'} onClick={() => { if (item._id && !item.readAt) void markNotificationRead(item._id); setOpen(false) }} className={`flex gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-muted ${item.readAt ? '' : 'bg-muted/40'}`}>
+                <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-muted">{iconFor(item.type)}</span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold">{item.title}</span>
+                  {item.body && <span className="mt-0.5 block text-xs text-muted-foreground">{item.body}</span>}
+                  <span className="mt-1 block text-[11px] text-muted-foreground/70">{formatRelative(item.createdAt)}</span>
+                </span>
+              </a>
+            )) : <p className="p-8 text-center text-sm text-muted-foreground">You&apos;re all caught up — no notifications yet.</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Header() {
   const { user } = useOlivState()
@@ -38,7 +101,10 @@ export function Header() {
         <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">{navLinks}</nav>
         <div className="flex items-center gap-2">
           {!user && <a href="/login" className="hidden rounded-full px-3 py-2 text-sm font-medium sm:block">Log in</a>}
-          {user && <button onClick={logout} aria-label="Log out" title="Log out" className="hidden size-9 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground sm:grid"><LogOut className="size-4" /></button>}
+          {user && <>
+            <NotificationBell />
+            <button onClick={logout} aria-label="Log out" title="Log out" className="hidden size-9 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground sm:grid"><LogOut className="size-4" /></button>
+          </>}
           <a href="/profile" aria-label="Open profile" onClick={close} className="grid size-9 place-items-center rounded-full border border-border bg-card"><UserCircle className="size-5" /></a>
           <button onClick={() => setOpen(!open)} aria-label={open ? 'Close menu' : 'Open menu'} aria-expanded={open} className="grid size-9 place-items-center rounded-full border border-border bg-card md:hidden">
             {open ? <X className="size-5" /> : <Menu className="size-5" />}
@@ -96,13 +162,16 @@ export function DiscoverPage() {
   const [stateFilter, setStateFilter] = useState('All states')
   const [mode, setMode] = useState<'list' | 'map'>('list')
   const { homes, loading } = useOlivState()
-  const filtered = useMemo(() => homes.filter((home) => {
-    const haystack = `${home.title} ${home.location.city} ${home.location.address}`.toLowerCase()
-    const matchesQuery = haystack.includes(query.toLowerCase())
-    const cities = STATE_CITIES[stateFilter] ?? []
-    const matchesState = stateFilter === 'All states' || cities.some((city) => home.location.city.toLowerCase().includes(city.toLowerCase()))
-    return matchesQuery && matchesState
-  }), [homes, query, stateFilter])
+  const filtered = useMemo(() => {
+    const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    return homes.filter((home) => {
+      const state = stateForCity(home.location)
+      const haystack = `${home.title} ${home.location.city} ${home.location.state ?? ''} ${state ?? ''} ${home.location.address}`.toLowerCase()
+      const matchesQuery = !terms.length || terms.every((term) => haystack.includes(term))
+      const matchesState = stateFilter === 'All states' || state === stateFilter
+      return matchesQuery && matchesState
+    })
+  }, [homes, query, stateFilter])
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -195,7 +264,7 @@ export function ListingPage({ id = '' }: { id?: string }) {
   const submitReview = async () => {
     if (review.trim().length < 5) { notify('Write a little more about the home'); return }
     setBusy(true)
-    try { await addReview(id, rating, review); setReview(''); notify('Review submitted for moderation') } catch (error) { notify(error instanceof Error ? error.message : 'Unable to submit review') } finally { setBusy(false) }
+    try { await addReview(id, rating, review); setReview(''); notify('Review submitted — thank you!') } catch (error) { notify(error instanceof Error ? error.message : 'Unable to submit review') } finally { setBusy(false) }
   }
   return (
     <div className="min-h-screen bg-background">
@@ -560,12 +629,14 @@ export function AgentOnboardingPage() {
 // __NEXT_ADMIN__
 
 type AgentOverview = {
-  agent?: { name: string; email: string; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentStatesServed?: string[] }
+  agent?: { name?: string; email?: string; phone?: string; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
   properties?: Property[]
   metrics?: { activeListings: number; draftListings: number; viewingRequests: number; inquiries: number }
   error?: string
   needsOnboarding?: boolean
 }
+type AgentRequest = { _id: string; propertyId: string; propertyTitle?: string; userId: string; userName?: string; userEmail?: string; type?: 'VIEWING' | 'INQUIRY'; status: string; preferredDate?: string; preferredTime?: string; message?: string; agentReply?: string; createdAt?: string }
+type AgentReview = { _id: string; propertyId: string; propertyTitle?: string; authorName: string; rating: number; text: string; status?: string; createdAt?: string }
 
 function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Property) => void; onCancel: () => void }) {
   const [title, setTitle] = useState('')
@@ -574,6 +645,7 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
   const [price, setPrice] = useState('')
   const [address, setAddress] = useState('')
   const [city, setCity] = useState('')
+  const [state, setState] = useState('')
   const [postalCode, setPostalCode] = useState('')
   const [bedrooms, setBedrooms] = useState('2')
   const [bathrooms, setBathrooms] = useState('2')
@@ -615,7 +687,7 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
     try {
       const response = await fetch('/api/agent/properties', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
         title, description, type, price: Number(price),
-        location: { address, city, postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
+        location: { address, city, ...(state ? { state } : {}), postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
         bedrooms: Number(bedrooms), bathrooms: Number(bathrooms), squareMeters: Number(squareMeters),
         furnished, amenities: amenities.split(',').map((item) => item.trim()).filter(Boolean), images, published: true,
       }) })
@@ -662,10 +734,17 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">Street address<input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="201 Grand Key Loop East" className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">City<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Yenagoa" className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">State <span className="font-normal text-muted-foreground">(auto-filled when you pin the map)</span>
+          <select value={state} onChange={(event) => setState(event.target.value)} className={field}>
+            <option value="">Select state…</option>
+            {nigerianStates.map((item) => <option key={item} value={item}>{item === 'FCT' ? 'FCT · Abuja' : item}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">Postal code<input value={postalCode} onChange={(event) => setPostalCode(event.target.value)} placeholder="560001" className={field} /></label>
       </div>
       <div className="mt-4">
         <p className="text-sm font-medium">Pin the location on the map <span className="font-normal text-muted-foreground">(optional — helps renters find you)</span></p>
-        <div className="mt-2"><MapPicker value={coordinates} onChange={(location) => { setCoordinates(location); if (location?.address && !address) setAddress(location.address); if (location?.city && !city) setCity(location.city) }} /></div>
+        <div className="mt-2"><MapPicker value={coordinates} onChange={(location) => { setCoordinates(location); if (location?.address && !address) setAddress(location.address); if (location?.city && !city) setCity(location.city); if (location?.state && !state) setState(location.state) }} /></div>
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-4">
         <label className="flex flex-col gap-1.5 text-sm font-medium">Bedrooms<input value={bedrooms} onChange={(event) => setBedrooms(event.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className={field} /></label>
@@ -683,21 +762,110 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
   )
 }
 
+function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<AgentOverview['agent']>; onSaved: (agent: Record<string, unknown>) => void; onCancel: () => void }) {
+  const [companyName, setCompanyName] = useState(agent.agentCompanyName ?? '')
+  const [licenseNumber, setLicenseNumber] = useState(agent.agentLicenseNumber ?? '')
+  const [phone, setPhone] = useState(agent.phone ?? '')
+  const [bio, setBio] = useState(agent.agentBio ?? '')
+  const [statesServed, setStatesServed] = useState<string[]>(agent.agentStatesServed ?? [])
+  const [officeLocation, setOfficeLocation] = useState<PickedLocation | null>(agent.agentOfficeLocation ? { lat: agent.agentOfficeLocation.lat, lng: agent.agentOfficeLocation.lng, address: agent.agentOfficeLocation.address, city: agent.agentOfficeLocation.city, state: agent.agentOfficeLocation.state } : null)
+  const [busy, setBusy] = useState(false)
+  const [toast, setToast] = useState('')
+  const notify = (text: string) => { setToast(text); setTimeout(() => setToast(''), 3200) }
+  const toggleState = (state: string) => setStatesServed((current) => current.includes(state) ? current.filter((item) => item !== state) : [...current, state])
+  const field = 'w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-ring'
+  const save = async () => {
+    if (companyName.trim().length < 2) { notify('Enter your company name.'); return }
+    setBusy(true)
+    try {
+      const response = await fetch('/api/agent/profile', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ companyName: companyName.trim(), licenseNumber: licenseNumber.trim(), phone: phone.trim(), bio: bio.trim(), statesServed, officeLocation }) })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) { notify(result.error ?? 'Unable to save settings.'); return }
+      onSaved(result.agent ?? {})
+      notify('Profile settings saved')
+    } catch { notify('Unable to save settings. Check your connection.') } finally { setBusy(false) }
+  }
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-serif text-2xl"><Settings className="size-5" />Agent settings</h2>
+        <button onClick={onCancel} aria-label="Close settings" className="grid size-9 place-items-center rounded-full border border-border"><X className="size-4" /></button>
+      </div>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5 text-sm font-medium">Company name<input value={companyName} onChange={(event) => setCompanyName(event.target.value)} placeholder="Ebi Homes" className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">License number<input value={licenseNumber} onChange={(event) => setLicenseNumber(event.target.value)} placeholder="BAY-AG-003" className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+234 803 000 0002" className={field} /></label>
+      </div>
+      <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium">Short bio
+        <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={3} placeholder="Tell renters about your agency…" className={field} />
+      </label>
+      <div className="mt-4">
+        <p className="text-sm font-medium">States you serve</p>
+        <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+          {nigerianStates.map((state) => (
+            <label key={state} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+              <input type="checkbox" checked={statesServed.includes(state)} onChange={() => toggleState(state)} className="size-4" />
+              <span className="truncate">{state === 'FCT' ? 'FCT · Abuja' : state}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4">
+        <p className="text-sm font-medium">Office location <span className="font-normal text-muted-foreground">(shown to renters)</span></p>
+        <div className="mt-2"><MapPicker value={officeLocation} onChange={setOfficeLocation} /></div>
+      </div>
+      <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
+        <button type="button" onClick={() => void save()} disabled={busy} className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? 'Saving…' : 'Save settings'}</button>
+        <button type="button" onClick={onCancel} className="rounded-full border border-border px-5 py-3 text-sm font-semibold">Cancel</button>
+      </div>
+      <Toast text={toast} />
+    </div>
+  )
+}
+
 export function AgentDashboardPage() {
   const [data, setData] = useState<AgentOverview | null>(null)
+  const [requests, setRequests] = useState<AgentRequest[]>([])
+  const [reviews, setReviews] = useState<AgentReview[]>([])
+  const [tab, setTab] = useState<'listings' | 'requests' | 'reviews'>('listings')
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [reload, setReload] = useState(0)
+  const [busyId, setBusyId] = useState('')
+  const [replyText, setReplyText] = useState<Record<string, string>>({})
+  const [notice, setNotice] = useState('')
+  const notify = (text: string) => { setNotice(text); setTimeout(() => setNotice(''), 3200) }
   useEffect(() => {
     let active = true
-    fetch('/api/agent/overview').then(async (response) => {
-      const result = await response.json().catch(() => ({}))
+    Promise.all([
+      fetch('/api/agent/overview').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+      fetch('/api/agent/requests').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+      fetch('/api/agent/reviews').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+    ]).then(([overview, requestData, reviewData]) => {
       if (!active) return
-      if (!response.ok) { setError(result.needsOnboarding ? 'onboarding' : result.error ?? 'Unable to load workspace.'); return }
-      setData(result)
+      if (!overview.ok) { setError(overview.body.needsOnboarding ? 'onboarding' : overview.body.error ?? 'Unable to load workspace.'); return }
+      setData(overview.body)
+      setRequests(requestData.ok ? (requestData.body.items ?? []) : [])
+      setReviews(reviewData.ok ? (reviewData.body.reviews ?? []) : [])
     }).catch(() => { if (active) setError('Unable to load workspace.') })
     return () => { active = false }
   }, [reload])
+  const respond = async (requestId: string, action: 'CONFIRM' | 'COMPLETE' | 'CANCEL' | 'REPLY') => {
+    const reply = (replyText[requestId] ?? '').trim()
+    if (action === 'REPLY' && reply.length < 2) { notify('Write a reply for the renter first.'); return }
+    setBusyId(requestId)
+    try {
+      const response = await fetch('/api/agent/requests', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ requestId, action, reply }) })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) { notify(result.error ?? 'Unable to update the request.'); return }
+      const statusByAction: Record<string, string> = { CONFIRM: 'CONFIRMED', COMPLETE: 'COMPLETED', CANCEL: 'CANCELLED', REPLY: 'REPLIED' }
+      setRequests((items) => items.map((item) => item._id === requestId ? { ...item, status: statusByAction[action], agentReply: action === 'REPLY' ? reply : item.agentReply } : item))
+      setReplyText((current) => { const next = { ...current }; delete next[requestId]; return next })
+      notify(action === 'REPLY' ? 'Reply sent to the renter' : 'Request updated')
+      setReload((value) => value + 1)
+    } catch { notify('Unable to update the request.') } finally { setBusyId('') }
+  }
   if (error === 'onboarding') return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-md px-4 py-24 text-center">
@@ -732,35 +900,103 @@ export function AgentDashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button onClick={() => setSettingsOpen((open) => !open)} className="flex items-center gap-1.5 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold"><Settings className="size-4" />{settingsOpen ? 'Close settings' : 'Settings'}</button>
             <button onClick={() => setShowForm((open) => !open)} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">{showForm ? 'Close form' : '+ Add listing'}</button>
             <a href="/discover" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">View public site</a>
           </div>
         </div>
+        {settingsOpen && data.agent && (
+          <div className="mt-6">
+            <AgentSettingsForm agent={data.agent} onSaved={(agent) => { setData((current) => current ? { ...current, agent: { ...current.agent, ...agent } } : current); setReload((value) => value + 1) }} onCancel={() => setSettingsOpen(false)} />
+          </div>
+        )}
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[['Active listings', metrics.activeListings], ['Drafts', metrics.draftListings], ['Viewing requests', metrics.viewingRequests], ['Inquiries', metrics.inquiries]].map(([label, value]) => (
-            <div key={label as string} className="rounded-2xl border border-border bg-card p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="mt-1 font-serif text-3xl">{value}</p></div>
-          ))}
+          <button onClick={() => setTab('listings')} className="rounded-2xl border border-border bg-card p-5 text-left"><p className="text-sm text-muted-foreground">Active listings</p><p className="mt-1 font-serif text-3xl">{metrics.activeListings}</p></button>
+          <button onClick={() => setTab('listings')} className="rounded-2xl border border-border bg-card p-5 text-left"><p className="text-sm text-muted-foreground">Drafts</p><p className="mt-1 font-serif text-3xl">{metrics.draftListings}</p></button>
+          <button onClick={() => setTab('requests')} className="rounded-2xl border border-border bg-card p-5 text-left"><p className="text-sm text-muted-foreground">Viewing requests</p><p className="mt-1 font-serif text-3xl">{metrics.viewingRequests}</p></button>
+          <button onClick={() => setTab('requests')} className="rounded-2xl border border-border bg-card p-5 text-left"><p className="text-sm text-muted-foreground">Inquiries</p><p className="mt-1 font-serif text-3xl">{metrics.inquiries}</p></button>
         </div>
         {showForm && (
           <div className="mt-8">
             <AddListingForm onCreated={() => { setShowForm(false); setReload((value) => value + 1) }} onCancel={() => setShowForm(false)} />
           </div>
         )}
-        <section className="mt-9">
-          <h2 className="font-serif text-2xl">Your listings</h2>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
-            {data.properties?.length ? data.properties.map((property) => (
-              <div key={property._id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 last:border-b-0">
-                <div className="min-w-0">
-                  <a href={`/listing/${property._id}`} className="font-medium hover:underline">{property.title}</a>
-                  <p className="text-xs text-muted-foreground">{property.location.city} · {formatNaira(property.price)} / year</p>
+        <div className="mt-9 flex gap-2 border-b border-border pb-px">
+          {([['listings', `Listings (${(data.properties ?? []).length})`], ['requests', `Requests (${requests.length})`], ['reviews', `Reviews (${reviews.length})`]] as const).map(([value, label]) => (
+            <button key={value} onClick={() => setTab(value)} className={`rounded-t-xl px-4 py-2.5 text-sm font-semibold ${tab === value ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`}>{label}</button>
+          ))}
+        </div>
+        {tab === 'listings' && (
+          <section className="mt-4">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              {data.properties?.length ? data.properties.map((property) => (
+                <div key={property._id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 last:border-b-0">
+                  <div className="min-w-0">
+                    <a href={`/listing/${property._id}`} className="font-medium hover:underline">{property.title}</a>
+                    <p className="text-xs text-muted-foreground">{property.location.city}{property.location.state ? `, ${property.location.state}` : ''} · {formatNaira(property.price)} / year</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
-              </div>
-            )) : <p className="p-8 text-center text-sm text-muted-foreground">No listings yet. Once verified you can publish homes from here.</p>}
-          </div>
-        </section>
+              )) : <p className="p-8 text-center text-sm text-muted-foreground">No listings yet. Once verified you can publish homes from here.</p>}
+            </div>
+          </section>
+        )}
+        {tab === 'requests' && (
+          <section className="mt-4">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              {requests.length ? requests.map((request) => (
+                <div key={request._id} className="flex flex-col gap-3 border-b border-border px-5 py-4 last:border-b-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium">{request.propertyTitle ?? 'Listing'} <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">{request.type === 'INQUIRY' ? 'Inquiry' : 'Viewing'}</span></p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{request.userName}{request.userEmail ? ` · ${request.userEmail}` : ''}</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${request.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : request.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' : request.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{request.status.replace('_', ' ')}</span>
+                  </div>
+                  {request.type === 'VIEWING' ? (
+                    <p className="text-sm">Would like to view it on <strong>{formatDate(request.preferredDate)}</strong>{request.preferredTime ? ` (${request.preferredTime})` : ''}</p>
+                  ) : <p className="text-sm">{request.message}</p>}
+                  {request.agentReply && <p className="rounded-lg bg-muted px-3 py-2 text-xs"><strong>Your reply: </strong>{request.agentReply}</p>}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {request.type === 'VIEWING' && request.status === 'PENDING' && (<>
+                      <button onClick={() => void respond(request._id, 'CONFIRM')} disabled={busyId === request._id} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">Confirm viewing</button>
+                      <button onClick={() => void respond(request._id, 'CANCEL')} disabled={busyId === request._id} className="rounded-full border border-border px-4 py-2 text-xs font-semibold disabled:opacity-60">Decline</button>
+                    </>)}
+                    {request.type === 'VIEWING' && request.status === 'CONFIRMED' && (<>
+                      <button onClick={() => void respond(request._id, 'COMPLETE')} disabled={busyId === request._id} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">Mark completed</button>
+                      <button onClick={() => void respond(request._id, 'CANCEL')} disabled={busyId === request._id} className="rounded-full border border-border px-4 py-2 text-xs font-semibold disabled:opacity-60">Cancel</button>
+                    </>)}
+                    {request.type === 'INQUIRY' && request.status !== 'REPLIED' && (
+                      <div className="flex min-w-0 flex-1 gap-2">
+                        <input value={replyText[request._id] ?? ''} onChange={(event) => setReplyText((current) => ({ ...current, [request._id]: event.target.value }))} placeholder="Write your reply…" className="min-w-0 flex-1 rounded-full border border-border bg-background px-4 py-2 text-xs outline-none focus:border-ring" />
+                        <button onClick={() => void respond(request._id, 'REPLY')} disabled={busyId === request._id} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">Send</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )) : <p className="p-8 text-center text-sm text-muted-foreground">No viewing requests or inquiries yet. They will appear here the moment a renter books or messages you.</p>}
+            </div>
+          </section>
+        )}
+        {tab === 'reviews' && (
+          <section className="mt-4">
+            <div className="overflow-hidden rounded-2xl border border-border bg-card">
+              {reviews.length ? reviews.map((review) => (
+                <div key={review._id} className="border-b border-border px-5 py-4 last:border-b-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium">{review.propertyTitle ?? 'Listing'}</p>
+                    <div className="flex items-center gap-1">{[1, 2, 3, 4, 5].map((value) => <Star key={value} className={value <= review.rating ? 'size-3.5 fill-accent-foreground text-accent-foreground' : 'size-3.5 text-muted-foreground'} />)}</div>
+                  </div>
+                  <p className="mt-1 text-sm">{review.text}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{review.authorName} · {formatDate(review.createdAt)}{review.status && review.status !== 'PUBLISHED' ? ` · ${review.status.replace('_', ' ')}` : ''}</p>
+                </div>
+              )) : <p className="p-8 text-center text-sm text-muted-foreground">No reviews on your listings yet.</p>}
+            </div>
+          </section>
+        )}
+        {/* __DASHBOARD_REQUEST_SECTION__ */}
       </main>
+      <Toast text={notice} />
     </div>
   )
 }

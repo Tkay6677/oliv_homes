@@ -12,7 +12,7 @@ export async function GET() {
     const agentId = user._id!.toString()
     const [properties, requests] = await Promise.all([listAgentProperties(agentId), agentRequestsSummary(agentId)])
     return NextResponse.json({
-      agent: { name: user.name, email: user.email, role: user.role, agentVerificationStatus: user.agentVerificationStatus ?? 'NOT_STARTED', agentVerificationLevel: user.agentVerificationLevel ?? 0, agentCompanyName: user.agentCompanyName, agentStatesServed: user.agentStatesServed ?? [] },
+      agent: { name: user.name, email: user.email, phone: user.phone ?? '', role: user.role, agentVerificationStatus: user.agentVerificationStatus ?? 'NOT_STARTED', agentVerificationLevel: user.agentVerificationLevel ?? 0, agentCompanyName: user.agentCompanyName, agentLicenseNumber: user.agentLicenseNumber, agentBio: user.agentBio, agentStatesServed: user.agentStatesServed ?? [], agentOfficeLocation: user.agentOfficeLocation },
       properties, requests,
       metrics: { activeListings: properties.filter((property) => property.published).length, draftListings: properties.filter((property) => !property.published).length, viewingRequests: requests.viewing, inquiries: requests.inquiries },
     })

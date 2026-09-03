@@ -49,6 +49,7 @@ export interface Property {
   location: {
     address: string
     city: string
+    state?: string
     postalCode: string
     country: string
     coordinates?: {
@@ -83,20 +84,24 @@ export interface Inquiry {
   propertyId: string
   agentId: string
   message: string
+  agentReply?: string
   status: 'PENDING' | 'REPLIED' | 'ARCHIVED'
   createdAt?: Date
   updatedAt?: Date
 }
 
-// Viewing request document
+// Viewing request document (viewingRequests collection holds VIEWING + INQUIRY records)
 export interface ViewingRequest {
   _id?: string
   userId: string
   propertyId: string
   agentId: string
-  preferredDate: Date
-  preferredTime: string
-  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED'
+  type?: 'VIEWING' | 'INQUIRY'
+  preferredDate?: Date | string
+  preferredTime?: string
+  message?: string
+  agentReply?: string
+  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REPLIED' | 'ARCHIVED'
   notes?: string
   createdAt?: Date
   updatedAt?: Date
@@ -122,6 +127,34 @@ export interface ApiResponse<T = unknown> {
   data?: T
   error?: string
   message?: string
+}
+
+// In-app notification document (notifications collection)
+export type NotificationType =
+  | 'VIEWING_REQUEST'
+  | 'INQUIRY'
+  | 'VIEWING_CONFIRMED'
+  | 'VIEWING_DECLINED'
+  | 'VIEWING_COMPLETED'
+  | 'INQUIRY_REPLIED'
+  | 'REVIEW_RECEIVED'
+  | 'AGENT_APPLICATION'
+  | 'VERIFICATION_UNDER_REVIEW'
+  | 'VERIFICATION_APPROVED'
+  | 'VERIFICATION_REJECTED'
+  | 'VERIFICATION_SUSPENDED'
+  | 'LISTING_PUBLISHED'
+  | 'SYSTEM'
+
+export interface Notification {
+  _id?: string
+  recipientId: string
+  type: NotificationType
+  title: string
+  body?: string
+  link?: string
+  readAt?: Date | string | null
+  createdAt?: Date | string
 }
 
 export interface AuthResponse {
