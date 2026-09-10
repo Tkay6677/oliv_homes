@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
 import { publicUser, submitAgentApplication } from '@/lib/oliv-db'
+import { OLIV_MARKET } from '@/lib/oliv-data'
 
 export const runtime = 'nodejs'
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     if (phone.replace(/\D/g, '').length < 7) return NextResponse.json({ error: 'Enter a valid phone number.' }, { status: 400 })
     if (companyName.length < 2) return NextResponse.json({ error: 'Enter your agency or company name.' }, { status: 400 })
     if (licenseNumber.length < 3) return NextResponse.json({ error: 'Enter your license or registration number.' }, { status: 400 })
-    if (!states.length) return NextResponse.json({ error: 'Select at least one state you serve.' }, { status: 400 })
+    if (!states.length || states.some((state) => state.toLowerCase() !== OLIV_MARKET.state.toLowerCase())) return NextResponse.json({ error: `Agent applications are currently limited to ${OLIV_MARKET.city}, ${OLIV_MARKET.state}.` }, { status: 400 })
     const updated = await submitAgentApplication(user._id!.toString(), { name, phone, agentCompanyName: companyName, agentLicenseNumber: licenseNumber, agentBio: bio, agentStatesServed: states, agentOfficeLocation: office })
     return NextResponse.json({ user: publicUser(updated as unknown as Record<string, unknown>), message: 'Application submitted for review.' })
   } catch (error) {

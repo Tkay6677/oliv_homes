@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getMongoDb } from '@/lib/mongodb'
 import { ensureOlivIndexes } from '@/lib/mongodb-indexes'
 import { escapeRegex, ok, parseLimit, parsePage, serverError, textQuery } from '@/lib/authz'
+import { OLIV_MARKET } from '@/lib/oliv-data'
 import type { Property } from '@/lib/types'
 
 export const runtime = 'nodejs'
@@ -18,13 +19,13 @@ export async function GET(request: NextRequest) {
     const type = textQuery(params.get('type'), 30)
     const page = parsePage(params.get('page'))
     const limit = parseLimit(params.get('limit'))
-    const filter: Record<string, unknown> = { published: true }
+    const filter: Record<string, unknown> = { published: true, 'location.city': new RegExp(`^${escapeRegex(OLIV_MARKET.city)}$`, 'i') }
 
     if (query) {
       const pattern = new RegExp(escapeRegex(query), 'i')
       filter.$or = [{ title: pattern }, { description: pattern }, { 'location.city': pattern }, { 'location.address': pattern }]
     }
-    if (city) filter['location.city'] = new RegExp(escapeRegex(city), 'i')
+    if (city && city.toLowerCase() === OLIV_MARKET.city.toLowerCase()) filter['location.city'] = new RegExp(`^${escapeRegex(city)}$`, 'i')
     if (type && ['apartment', 'house', 'studio', 'townhouse', 'shared'].includes(type)) filter.type = type
 
     const db = await getMongoDb()

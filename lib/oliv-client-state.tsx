@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Property } from './types'
-import { olivHomes as seededHomes } from './oliv-data'
+import { OLIV_MARKET, olivHomes as seededHomes } from './oliv-data'
 
 type Review = { _id?: string; id?: string; propertyId: string; author?: string; authorName?: string; rating: number; text: string; status?: string; createdAt?: string }
 type User = { _id?: string; name: string; email: string; role: 'USER' | 'AGENT' | 'SUPER_ADMIN'; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
@@ -61,7 +61,7 @@ export function OlivStateProvider({ children }: { children: React.ReactNode }) {
     setLoading(true)
     try {
       const [properties, auth, reviewItems] = await Promise.all([
-        fetch('/api/properties?limit=200').then((r) => r.ok ? r.json() : { items: [] }),
+        fetch(`/api/properties?city=${encodeURIComponent(OLIV_MARKET.city)}&limit=200`).then((r) => r.ok ? r.json() : { items: [] }),
         fetch('/api/auth').then((r) => r.ok ? r.json() : { user: null }),
         fetch('/api/reviews').then((r) => r.ok ? r.json() : { items: [] }),
       ])

@@ -1,5 +1,12 @@
 import type { Property } from '@/lib/types'
 
+export const OLIV_MARKET = {
+  city: 'Amassoma',
+  state: 'Bayelsa',
+  country: 'Nigeria',
+  center: { lat: 4.9730872, lng: 6.1089697 },
+} as const
+
 export const nigerianStates = ['Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'] as const
 
 // Known major cities per state — used to infer the state of listings that only record a city.

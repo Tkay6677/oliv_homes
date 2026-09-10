@@ -205,6 +205,28 @@ export async function createAgentProperty(agentId: string, input: {
   }
   return property
 }
+export async function updateAgentProperty(agentId: string, propertyId: string, input: {
+  title: string; description: string; type: Property['type']; price: number
+  location: Property['location']; bedrooms: number; bathrooms: number; squareMeters: number
+  furnished: boolean; amenities: string[]; images: string[]; published: boolean
+}) {
+  if (!ObjectId.isValid(propertyId)) throw new Error('Listing not found.')
+  const db = await dbReady(); const now = new Date()
+  const result = await db.collection('properties').findOneAndUpdate({ _id: new ObjectId(propertyId), agentId }, { $set: { ...input, updatedAt: now } }, { returnDocument: 'after' })
+  if (!result) throw new Error('Listing not found.')
+  return clean(result) as unknown as Property
+}
+export async function deleteAgentProperty(agentId: string, propertyId: string) {
+  if (!ObjectId.isValid(propertyId)) throw new Error('Listing not found.')
+  const db = await dbReady(); const _id = new ObjectId(propertyId)
+  const result = await db.collection('properties').deleteOne({ _id, agentId })
+  if (!result.deletedCount) throw new Error('Listing not found.')
+  await Promise.all([
+    db.collection('savedProperties').deleteMany({ propertyId }),
+    db.collection('reviews').deleteMany({ propertyId }),
+    db.collection('viewingRequests').deleteMany({ propertyId }),
+  ])
+}
 
 // Favorites and viewing requests
 export async function listFavoritesWithHomes(userId: string) { const db = await dbReady(); const favorites = await db.collection('savedProperties').find({ userId }).sort({ createdAt: -1 }).toArray(); const ids = favorites.map((favorite) => { try { return new ObjectId(favorite.propertyId) } catch { return null } }).filter((id): id is ObjectId => id !== null); if (!ids.length) return []; const properties = await db.collection('properties').find({ _id: { $in: ids } }).toArray(); return clean(properties) }

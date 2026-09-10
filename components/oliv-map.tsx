@@ -4,13 +4,13 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
-import { formatNaira } from '@/lib/oliv-data'
+import { formatNaira, OLIV_MARKET } from '@/lib/oliv-data'
 
 export type MapPoint = { lat: number; lng: number }
 export type PickedLocation = MapPoint & { address?: string; city?: string; state?: string }
 export type MapHome = { _id?: string; title: string; price: number; location: { address?: string; city?: string; coordinates?: MapPoint | null } }
 
-const NIGERIA_CENTER: MapPoint = { lat: 6.12, lng: 7.42 }
+const AMASSOMA_CENTER: MapPoint = OLIV_MARKET.center
 
 const pinIcon = (variant: 'primary' | 'accent' = 'primary') => L.divIcon({
   className: 'oliv-pin',
@@ -47,7 +47,7 @@ async function reverseGeocode(point: MapPoint): Promise<PickedLocation> {
 function FitPoints({ points }: { points: MapPoint[] }) {
   const map = useMap()
   useEffect(() => {
-    if (!points.length) { map.setView(NIGERIA_CENTER, 6); return }
+    if (!points.length) { map.setView(AMASSOMA_CENTER, 14); return }
     if (points.length === 1) map.setView(points[0], 15, { animate: true })
     else map.fitBounds(L.latLngBounds(points.map((point) => [point.lat, point.lng])), { padding: [40, 40] })
   }, [map, points])
@@ -59,9 +59,9 @@ function ClickPicker({ onPick }: { onPick: (point: MapPoint) => void }) {
   return null
 }
 
-function MapShell({ center, zoom = 6, children }: { center?: MapPoint; zoom?: number; children: React.ReactNode }) {
+function MapShell({ center, zoom = 14, children }: { center?: MapPoint; zoom?: number; children: React.ReactNode }) {
   return (
-    <MapContainer center={center ?? NIGERIA_CENTER} zoom={zoom} scrollWheelZoom={false} className="h-full w-full" attributionControl>
+    <MapContainer center={center ?? AMASSOMA_CENTER} zoom={zoom} scrollWheelZoom={false} className="h-full w-full" attributionControl>
       <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {children}
     </MapContainer>
@@ -78,14 +78,14 @@ export function PropertyListMap({ homes }: { homes: MapHome[] }) {
           <Marker key={home._id ?? home.title} position={[home.location.coordinates!.lat, home.location.coordinates!.lng]} icon={pinIcon('primary')}>
             <Popup>
               <strong className="font-serif">{home.title}</strong><br />
-              <span>{home.location.city ?? 'Nigeria'}</span><br />
+              <span>{home.location.city ?? OLIV_MARKET.city}</span><br />
               <span className="font-semibold">{formatNaira(home.price)} / year</span><br />
               <a href={`/listing/${home._id}`} className="underline">View listing</a>
             </Popup>
           </Marker>
         ))}
       </MapShell>
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full bg-card/90 px-3 py-1.5 text-xs font-medium backdrop-blur">{homes.length} mapped listing{homes.length === 1 ? '' : 's'} · Nigeria</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full bg-card/90 px-3 py-1.5 text-xs font-medium backdrop-blur">{homes.length} mapped listing{homes.length === 1 ? '' : 's'} · {OLIV_MARKET.city}</div>
     </div>
   )
 }
@@ -101,7 +101,7 @@ export function PropertyLocationMap({ home }: { home: MapHome }) {
           <Popup><strong className="font-serif">{home.title}</strong><br />{home.location.address ?? ''} {home.location.city ?? ''}</Popup>
         </Marker>
       </MapShell>
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full bg-card/90 px-3 py-1.5 text-xs font-medium backdrop-blur">{home.location.city ?? 'Nigeria'}</div>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full bg-card/90 px-3 py-1.5 text-xs font-medium backdrop-blur">{home.location.city ?? OLIV_MARKET.city}</div>
     </div>
   )
 }
@@ -130,7 +130,7 @@ export function MapPicker({ value, onChange }: { value: PickedLocation | null; o
   return (
     <div className='flex flex-col gap-3' ref={boxRef}>
       <div className='flex gap-2'>
-        <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void search() } }} placeholder='Search a Nigerian address, city or landmark…' className='min-w-0 flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-ring' aria-label='Search location' />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void search() } }} placeholder={`Search an address or landmark in ${OLIV_MARKET.city}…`} className='min-w-0 flex-1 rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-ring' aria-label='Search location' />
         <button type='button' onClick={() => void search()} disabled={busy} className='rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60'>{busy ? '…' : 'Search'}</button>
       </div>
       {error && <p className='text-xs text-red-600'>{error}</p>}
@@ -144,7 +144,7 @@ export function MapPicker({ value, onChange }: { value: PickedLocation | null; o
         </ul>
       )}
       <div className='relative h-64 overflow-hidden rounded-2xl border border-border shadow-sm'>
-        <MapShell center={value ? formatPoint(value) : undefined} zoom={value ? 15 : 6}>
+        <MapShell center={value ? formatPoint(value) : undefined} zoom={value ? 15 : 14}>
           <ClickPicker onPick={(point) => void pick(point)} />
           {value && <FitPoints points={[formatPoint(value)]} />}
           {value && <Marker position={[value.lat, value.lng]} icon={pinIcon('accent')} />}

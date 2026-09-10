@@ -2,8 +2,8 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Bell, BellDot, Building2, CalendarDays, Check, Heart, ImagePlus, LogOut, Map, MapPin, Menu, MessageCircle, Plus, Search, Settings, ShieldCheck, Star, Trash2, UserCircle, X } from 'lucide-react'
-import { formatNaira, homeImage, nigerianStates, stateForCity } from '@/lib/oliv-data'
+import { ArrowLeft, Bell, BellDot, Building2, CalendarDays, Check, Heart, ImagePlus, LogOut, Map, MapPin, Menu, MessageCircle, Moon, Plus, Search, Settings, ShieldCheck, Star, Sun, Trash2, UserCircle, X } from 'lucide-react'
+import { formatNaira, homeImage, nigerianStates, OLIV_MARKET } from '@/lib/oliv-data'
 import { useOlivState } from '@/lib/oliv-client-state'
 import type { PickedLocation } from '@/components/oliv-map'
 import type { Property } from '@/lib/types'
@@ -84,6 +84,9 @@ function NotificationBell() {
 export function Header() {
   const { user } = useOlivState()
   const [open, setOpen] = useState(false)
+  const [dark, setDark] = useState(false)
+  useEffect(() => { const savedTheme = localStorage.getItem('oliv-theme'); const isDark = savedTheme === 'dark'; setDark(isDark); document.documentElement.classList.toggle('dark', isDark) }, [])
+  const toggleTheme = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle('dark', next); localStorage.setItem('oliv-theme', next ? 'dark' : 'light') }
   const close = () => setOpen(false)
   const logout = async () => { close(); await fetch('/api/auth', { method: 'DELETE' }).catch(() => null); window.location.href = '/' }
   const navLinks = (
@@ -100,6 +103,7 @@ export function Header() {
         <a href="/" className="flex items-center gap-2" onClick={close}><span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground"><Building2 className="size-4" /></span><span className="font-serif text-xl font-semibold">OLIV<span className="text-accent-foreground"> Homes</span></span></a>
         <nav className="hidden items-center gap-7 text-sm font-medium text-muted-foreground md:flex">{navLinks}</nav>
         <div className="flex items-center gap-2">
+          <button onClick={toggleTheme} aria-label={dark ? 'Use light theme' : 'Use dark theme'} title={dark ? 'Use light theme' : 'Use dark theme'} className="grid size-9 place-items-center rounded-full border border-border bg-card text-muted-foreground hover:text-foreground">{dark ? <Sun className="size-4" /> : <Moon className="size-4" />}</button>
           {!user && <a href="/login" className="hidden rounded-full px-3 py-2 text-sm font-medium sm:block">Log in</a>}
           {user && <>
             <NotificationBell />
@@ -159,28 +163,25 @@ function PropertyCard({ id }: { id: string }) {
 
 export function DiscoverPage() {
   const [query, setQuery] = useState('')
-  const [stateFilter, setStateFilter] = useState('All states')
   const [mode, setMode] = useState<'list' | 'map'>('list')
   const { homes, loading } = useOlivState()
   const filtered = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
     return homes.filter((home) => {
-      const state = stateForCity(home.location)
-      const haystack = `${home.title} ${home.location.city} ${home.location.state ?? ''} ${state ?? ''} ${home.location.address}`.toLowerCase()
+      const haystack = `${home.title} ${home.location.city} ${home.location.state ?? ''} ${home.location.address}`.toLowerCase()
       const matchesQuery = !terms.length || terms.every((term) => haystack.includes(term))
-      const matchesState = stateFilter === 'All states' || state === stateFilter
-      return matchesQuery && matchesState
+      return matchesQuery
     })
-  }, [homes, query, stateFilter])
+  }, [homes, query])
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-10">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Bayelsa first · Nigeria wide</p>
+            <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Amassoma · Bayelsa</p>
             <h1 className="mt-2 font-serif text-4xl tracking-tight sm:text-5xl">Find your next place</h1>
-            <p className="mt-2 text-sm text-muted-foreground">Yenagoa, Port Harcourt, Abuja, Lagos and more.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Homes and rentals around {OLIV_MARKET.city} town.</p>
           </div>
           <div className="flex rounded-full border border-border bg-card p-1 text-sm">
             <button onClick={() => setMode('list')} className={`rounded-full px-4 py-2 ${mode === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>List</button>
@@ -190,11 +191,9 @@ export function DiscoverPage() {
         <div className="mt-7 flex flex-col gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm sm:flex-row">
           <div className="flex min-w-0 flex-1 items-center gap-2 px-3">
             <Search className="size-4 text-muted-foreground" />
-            <input aria-label="Search Nigerian homes" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search Yenagoa, Lagos, Abuja..." className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" />
+            <input aria-label={`Search ${OLIV_MARKET.city} homes`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${OLIV_MARKET.city} homes...`} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" />
           </div>
-          <select aria-label="Filter by state" value={stateFilter} onChange={(event) => setStateFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none">
-            {['All states', ...nigerianStates].map((state) => <option key={state} value={state}>{state === 'FCT' ? 'FCT · Abuja' : state}</option>)}
-          </select>
+          <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">{OLIV_MARKET.city}, {OLIV_MARKET.state}</div>
         </div>
         <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
           <span>{loading ? 'Loading Nigerian homes…' : `${filtered.length} home${filtered.length === 1 ? '' : 's'} found`}</span>
@@ -468,7 +467,7 @@ export function AgentOnboardingPage() {
   const [companyName, setCompanyName] = useState('')
   const [licenseNumber, setLicenseNumber] = useState('')
   const [bio, setBio] = useState('')
-  const [statesServed, setStatesServed] = useState<string[]>([])
+  const [statesServed] = useState<string[]>([OLIV_MARKET.state])
   const [office, setOffice] = useState<PickedLocation | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -489,7 +488,6 @@ export function AgentOnboardingPage() {
     return () => { active = false }
   }, [])
 
-  const toggleState = (state: string) => setStatesServed((current) => current.includes(state) ? current.filter((item) => item !== state) : [...current, state].slice(0, 5))
   const stepValid = step === 0 ? name.trim().length >= 2 && phone.replace(/\D/g, '').length >= 7 : step === 1 ? companyName.trim().length >= 2 && licenseNumber.trim().length >= 3 : statesServed.length > 0
   const submit = async () => {
     setBusy(true); setError('')
@@ -508,7 +506,7 @@ export function AgentOnboardingPage() {
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <ShieldCheck className="mx-auto size-14 text-accent-foreground" />
         <h1 className="mt-4 font-serif text-4xl">Become an OLIV agent</h1>
-        <p className="mt-3 text-sm text-muted-foreground">List verified homes across Nigeria. Sign in or create an account to start your application — it takes about 3 minutes.</p>
+        <p className="mt-3 text-sm text-muted-foreground">List verified homes in Amassoma, Bayelsa. Sign in or create an account to start your application — it takes about 3 minutes.</p>
         <div className="mt-7 flex justify-center gap-3">
           <a href="/login?next=/agent/onboarding" className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Sign in</a>
           <a href="/signup" className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold">Create account</a>
@@ -599,12 +597,9 @@ export function AgentOnboardingPage() {
             <div className="flex flex-col gap-5">
               <h2 className="font-serif text-2xl">Where do you operate?</h2>
               <div>
-                <p className="text-sm font-medium">States you serve <span className="font-normal text-muted-foreground">(up to 5)</span></p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {nigerianStates.map((state) => (
-                    <button key={state} type="button" onClick={() => toggleState(state)} className={`rounded-full border px-3.5 py-1.5 text-sm ${statesServed.includes(state) ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground'}`}>{state === 'FCT' ? 'FCT · Abuja' : state}</button>
-                  ))}
-                </div>
+                <p className="text-sm font-medium">Market coverage</p>
+                <div className="mt-2 rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{OLIV_MARKET.city}, {OLIV_MARKET.state}</div>
+                <p className="mt-2 text-xs text-muted-foreground">OLIV currently accepts agent applications for homes within Amassoma town.</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Office location <span className="font-normal text-muted-foreground">(optional)</span></p>
@@ -638,23 +633,23 @@ type AgentOverview = {
 type AgentRequest = { _id: string; propertyId: string; propertyTitle?: string; userId: string; userName?: string; userEmail?: string; type?: 'VIEWING' | 'INQUIRY'; status: string; preferredDate?: string; preferredTime?: string; message?: string; agentReply?: string; createdAt?: string }
 type AgentReview = { _id: string; propertyId: string; propertyTitle?: string; authorName: string; rating: number; text: string; status?: string; createdAt?: string }
 
-function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Property) => void; onCancel: () => void }) {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [type, setType] = useState<Property['type']>('apartment')
-  const [price, setPrice] = useState('')
-  const [address, setAddress] = useState('')
-  const [city, setCity] = useState('')
-  const [state, setState] = useState('')
-  const [postalCode, setPostalCode] = useState('')
-  const [bedrooms, setBedrooms] = useState('2')
-  const [bathrooms, setBathrooms] = useState('2')
-  const [squareMeters, setSquareMeters] = useState('100')
-  const [furnished, setFurnished] = useState(false)
-  const [amenities, setAmenities] = useState('')
-  const [images, setImages] = useState<string[]>([])
+function AddListingForm({ property, onCreated, onCancel }: { property?: Property; onCreated: (property: Property) => void; onCancel: () => void }) {
+  const [title, setTitle] = useState(property?.title ?? '')
+  const [description, setDescription] = useState(property?.description ?? '')
+  const [type, setType] = useState<Property['type']>(property?.type ?? 'apartment')
+  const [price, setPrice] = useState(property ? String(property.price) : '')
+  const [address, setAddress] = useState(property?.location.address ?? '')
+  const [city, setCity] = useState(property?.location.city ?? OLIV_MARKET.city)
+  const [state, setState] = useState(property?.location.state ?? OLIV_MARKET.state)
+  const [postalCode, setPostalCode] = useState(property?.location.postalCode ?? '')
+  const [bedrooms, setBedrooms] = useState(property ? String(property.bedrooms) : '2')
+  const [bathrooms, setBathrooms] = useState(property ? String(property.bathrooms) : '2')
+  const [squareMeters, setSquareMeters] = useState(property ? String(property.squareMeters) : '100')
+  const [furnished, setFurnished] = useState(property?.furnished ?? false)
+  const [amenities, setAmenities] = useState(property?.amenities.join(', ') ?? '')
+  const [images, setImages] = useState<string[]>(property?.images ?? [])
   const [imageUrl, setImageUrl] = useState('')
-  const [coordinates, setCoordinates] = useState<PickedLocation | null>(null)
+  const [coordinates, setCoordinates] = useState<PickedLocation | null>(property?.location.coordinates ? { ...property.location.coordinates, address: property.location.address, city: property.location.city, state: property.location.state } : null)
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [toast, setToast] = useState('')
@@ -685,7 +680,7 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
     if (address.trim().length < 4 || city.trim().length < 2) { notify('Enter the street address and city.'); return }
     setBusy(true)
     try {
-      const response = await fetch('/api/agent/properties', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+      const response = await fetch('/api/agent/properties', { method: property ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(property?._id ? { propertyId: property._id } : {}),
         title, description, type, price: Number(price),
         location: { address, city, ...(state ? { state } : {}), postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
         bedrooms: Number(bedrooms), bathrooms: Number(bathrooms), squareMeters: Number(squareMeters),
@@ -700,12 +695,12 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
   return (
     <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 font-serif text-2xl"><ImagePlus className="size-5" />Add a new listing</h2>
+        <h2 className="flex items-center gap-2 font-serif text-2xl"><ImagePlus className="size-5" />{property ? 'Edit listing' : 'Add a new listing'}</h2>
         <button onClick={onCancel} aria-label="Close form" className="grid size-9 place-items-center rounded-full border border-border"><X className="size-4" /></button>
       </div>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-sm font-medium">Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. 3-bedroom apartment in Yenagoa" className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Riverside three-bedroom apartment" className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Yearly price (₦)<input value={price} onChange={(event) => setPrice(event.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="1250000" className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Property type<select value={type} onChange={(event) => setType(event.target.value as Property['type'])} className={field}>{['apartment', 'house', 'studio', 'townhouse', 'shared'].map((option) => <option key={option} value={option} className="capitalize">{option}</option>)}</select></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Amenities (comma separated)<input value={amenities} onChange={(event) => setAmenities(event.target.value)} placeholder="24/7 security, Parking, Generator" className={field} /></label>
@@ -733,12 +728,9 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
 
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">Street address<input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="201 Grand Key Loop East" className={field} /></label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium">City<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Yenagoa" className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">City<input value={city} onChange={(event) => setCity(event.target.value)} placeholder={OLIV_MARKET.city} className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">State <span className="font-normal text-muted-foreground">(auto-filled when you pin the map)</span>
-          <select value={state} onChange={(event) => setState(event.target.value)} className={field}>
-            <option value="">Select state…</option>
-            {nigerianStates.map((item) => <option key={item} value={item}>{item === 'FCT' ? 'FCT · Abuja' : item}</option>)}
-          </select>
+          <select value={state} onChange={(event) => setState(event.target.value)} className={field}><option value={OLIV_MARKET.state}>{OLIV_MARKET.state}</option></select>
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Postal code<input value={postalCode} onChange={(event) => setPostalCode(event.target.value)} placeholder="560001" className={field} /></label>
       </div>
@@ -753,7 +745,7 @@ function AddListingForm({ onCreated, onCancel }: { onCreated: (property: Propert
         <label className="flex items-center gap-2 self-end pb-2.5 text-sm font-medium"><input type="checkbox" checked={furnished} onChange={(event) => setFurnished(event.target.checked)} className="size-4" />Furnished</label>
       </div>
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
-        <button type="button" onClick={submit} disabled={busy} className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? 'Publishing…' : 'Publish listing'}</button>
+        <button type="button" onClick={submit} disabled={busy} className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? (property ? 'Saving…' : 'Publishing…') : (property ? 'Save changes' : 'Publish listing')}</button>
         <button type="button" onClick={onCancel} className="rounded-full border border-border px-5 py-3 text-sm font-semibold">Cancel</button>
         <p className="text-xs text-muted-foreground">Listings go live instantly and appear on Discover.</p>
       </div>
@@ -830,6 +822,7 @@ export function AgentDashboardPage() {
   const [tab, setTab] = useState<'listings' | 'requests' | 'reviews'>('listings')
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [reload, setReload] = useState(0)
   const [busyId, setBusyId] = useState('')
@@ -865,6 +858,16 @@ export function AgentDashboardPage() {
       notify(action === 'REPLY' ? 'Reply sent to the renter' : 'Request updated')
       setReload((value) => value + 1)
     } catch { notify('Unable to update the request.') } finally { setBusyId('') }
+  }
+  const deleteListing = async (property: Property) => {
+    if (!property._id || !window.confirm(`Delete “${property.title}”? This cannot be undone.`)) return
+    setBusyId(property._id)
+    try {
+      const response = await fetch(`/api/agent/properties?id=${encodeURIComponent(property._id)}`, { method: 'DELETE' })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) { notify(result.error ?? 'Unable to delete the listing.'); return }
+      notify('Listing deleted'); setReload((value) => value + 1)
+    } catch { notify('Unable to delete the listing.') } finally { setBusyId('') }
   }
   if (error === 'onboarding') return (
     <div className="min-h-screen bg-background"><Header />
@@ -921,6 +924,9 @@ export function AgentDashboardPage() {
             <AddListingForm onCreated={() => { setShowForm(false); setReload((value) => value + 1) }} onCancel={() => setShowForm(false)} />
           </div>
         )}
+        {editingProperty && (
+          <div className="mt-8"><AddListingForm property={editingProperty} onCreated={() => { setEditingProperty(null); setReload((value) => value + 1) }} onCancel={() => setEditingProperty(null)} /></div>
+        )}
         <div className="mt-9 flex gap-2 border-b border-border pb-px">
           {([['listings', `Listings (${(data.properties ?? []).length})`], ['requests', `Requests (${requests.length})`], ['reviews', `Reviews (${reviews.length})`]] as const).map(([value, label]) => (
             <button key={value} onClick={() => setTab(value)} className={`rounded-t-xl px-4 py-2.5 text-sm font-semibold ${tab === value ? 'border-b-2 border-primary text-foreground' : 'text-muted-foreground'}`}>{label}</button>
@@ -935,7 +941,11 @@ export function AgentDashboardPage() {
                     <a href={`/listing/${property._id}`} className="font-medium hover:underline">{property.title}</a>
                     <p className="text-xs text-muted-foreground">{property.location.city}{property.location.state ? `, ${property.location.state}` : ''} · {formatNaira(property.price)} / year</p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
+                    <button type="button" onClick={() => { setEditingProperty(property); setShowForm(false) }} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Edit</button>
+                    <button type="button" disabled={busyId === property._id} onClick={() => void deleteListing(property)} className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">{busyId === property._id ? 'Deleting…' : 'Delete'}</button>
+                  </div>
                 </div>
               )) : <p className="p-8 text-center text-sm text-muted-foreground">No listings yet. Once verified you can publish homes from here.</p>}
             </div>
