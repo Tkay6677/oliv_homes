@@ -85,7 +85,7 @@ export function Header() {
   const { user } = useOlivState()
   const [open, setOpen] = useState(false)
   const [dark, setDark] = useState(false)
-  useEffect(() => { const savedTheme = localStorage.getItem('oliv-theme'); const isDark = savedTheme === 'dark'; setDark(isDark); document.documentElement.classList.toggle('dark', isDark) }, [])
+  useEffect(() => { const savedTheme = localStorage.getItem('oliv-theme'); const isDark = savedTheme !== 'light'; setDark(isDark); document.documentElement.classList.toggle('dark', isDark) }, [])
   const toggleTheme = () => { const next = !dark; setDark(next); document.documentElement.classList.toggle('dark', next); localStorage.setItem('oliv-theme', next ? 'dark' : 'light') }
   const close = () => setOpen(false)
   const logout = async () => { close(); await fetch('/api/auth', { method: 'DELETE' }).catch(() => null); window.location.href = '/' }
@@ -374,7 +374,7 @@ export function LoginPage({ signup = false }: { signup?: boolean }) {
             <h1 className="font-serif text-3xl">{signup ? 'Create your account' : 'Welcome back'}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{signup ? 'Find and save Nigerian homes.' : 'Sign in to your saved homes and requests.'}</p>
           </div>
-          {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/60 dark:text-red-200">{error}</p>}
           {signup && (
             <label className="flex flex-col gap-1.5 text-sm font-medium">Full name
               <input value={name} onChange={(event) => setName(event.target.value)} required minLength={2} className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-ring" placeholder="Ada Okoro" />
@@ -567,7 +567,7 @@ export function AgentOnboardingPage() {
           ))}
         </div>
         <div className="mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm">
-          {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+          {error && <p role="alert" className="mb-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/60 dark:text-red-200">{error}</p>}
           {step === 0 && (
             <div className="flex flex-col gap-4">
               <h2 className="font-serif text-2xl">Tell us who you are</h2>
@@ -898,7 +898,7 @@ export function AgentDashboardPage() {
             <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Agent workspace</p>
             <h1 className="mt-2 font-serif text-4xl">{data.agent?.agentCompanyName ?? data.agent?.name}</h1>
             <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status === 'VERIFIED' ? 'bg-green-100 text-green-800' : status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800' : 'bg-muted text-muted-foreground'}`}>{status.replace('_', ' ')}</span>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status === 'VERIFIED' ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200' : status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200' : 'bg-muted text-muted-foreground'}`}>{status.replace('_', ' ')}</span>
               {data.agent?.agentStatesServed?.length ? `Serving ${data.agent.agentStatesServed.join(', ')}` : 'No states listed yet'}
             </p>
           </div>
@@ -942,7 +942,7 @@ export function AgentDashboardPage() {
                     <p className="text-xs text-muted-foreground">{property.location.city}{property.location.state ? `, ${property.location.state}` : ''} · {formatNaira(property.price)} / year</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
                     <button type="button" onClick={() => { setEditingProperty(property); setShowForm(false) }} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Edit</button>
                     <button type="button" disabled={busyId === property._id} onClick={() => void deleteListing(property)} className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50">{busyId === property._id ? 'Deleting…' : 'Delete'}</button>
                   </div>
@@ -961,7 +961,7 @@ export function AgentDashboardPage() {
                       <p className="font-medium">{request.propertyTitle ?? 'Listing'} <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">{request.type === 'INQUIRY' ? 'Inquiry' : 'Viewing'}</span></p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{request.userName}{request.userEmail ? ` · ${request.userEmail}` : ''}</p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${request.status === 'PENDING' ? 'bg-amber-100 text-amber-800' : request.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' : request.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 'bg-muted text-muted-foreground'}`}>{request.status.replace('_', ' ')}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${request.status === 'PENDING' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200' : request.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-200' : request.status === 'COMPLETED' ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200' : request.status === 'CANCELLED' || request.status === 'ARCHIVED' ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-200' : 'bg-muted text-muted-foreground'}`}>{request.status.replace('_', ' ')}</span>
                   </div>
                   {request.type === 'VIEWING' ? (
                     <p className="text-sm">Would like to view it on <strong>{formatDate(request.preferredDate)}</strong>{request.preferredTime ? ` (${request.preferredTime})` : ''}</p>
