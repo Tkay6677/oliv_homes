@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { getMongoDb } from './mongodb'
 import { ensureOlivIndexes } from './mongodb-indexes'
 import type { Property, Review } from './types'
+import { AMASSOMA_ZONES, type AmassomaZone } from './oliv-data'
 
 export type UserRole = 'USER' | 'AGENT' | 'SUPER_ADMIN'
 export type OlivUser = { _id?: string; name: string; email: string; phone?: string; role: UserRole; agentVerificationLevel?: number; agentVerificationStatus?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string }; agentSubmittedAt?: Date; agentReviewedAt?: Date; agentReviewedBy?: string; createdAt?: Date }
@@ -155,6 +156,27 @@ export async function updateAgentProfile(userId: string, patch: { phone?: string
   return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) }))
 }
 export async function adminOverview() { const db = await dbReady(); const [users, properties, pendingReviews, requests] = await Promise.all([db.collection('users').countDocuments(), db.collection('properties').countDocuments(), db.collection('reviews').countDocuments({ status: 'PENDING' }), db.collection('viewingRequests').countDocuments({ status: 'PENDING' })]); return { users, properties, pendingReviews, requests } }
+
+export async function listAmassomaZones() {
+  const db = await dbReady()
+  const stored = await db.collection<AmassomaZone>('marketAreas').find({ market: 'Amassoma' }).sort({ name: 1 }).toArray()
+  if (stored.length) return clean(stored)
+  const now = new Date()
+  await db.collection('marketAreas').insertMany(AMASSOMA_ZONES.map((area) => ({ market: 'Amassoma', ...area, createdAt: now, updatedAt: now })))
+  return AMASSOMA_ZONES
+}
+export async function saveAmassomaZone(input: AmassomaZone, originalName?: string) {
+  const db = await dbReady(); const now = new Date()
+  const filter = { market: 'Amassoma', name: originalName ?? input.name }
+  await db.collection('marketAreas').updateOne(filter, { $set: { market: 'Amassoma', ...input, updatedAt: now }, $setOnInsert: { createdAt: now } }, { upsert: true })
+  const saved = await db.collection<AmassomaZone>('marketAreas').findOne({ market: 'Amassoma', name: input.name })
+  if (!saved) throw new Error('The area was not saved. Please try again.')
+  return clean(saved)
+}
+export async function deleteAmassomaZone(name: string) {
+  const db = await dbReady(); const result = await db.collection('marketAreas').deleteOne({ market: 'Amassoma', name })
+  if (!result.deletedCount) throw new Error('Area not found.')
+}
 
 // Agent onboarding and verification
 export async function updateUser(userId: string, patch: Record<string, unknown>) { const db = await dbReady(); await db.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { ...patch, updatedAt: new Date() } }); return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) })) }

@@ -49,6 +49,7 @@ export interface Property {
   location: {
     address: string
     city: string
+    area?: string
     state?: string
     postalCode: string
     country: string

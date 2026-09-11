@@ -13,6 +13,7 @@ const MapSkeleton = ({ tall = false }: { tall?: boolean }) => <div className={`a
 const PropertyListMap = dynamic(() => import('@/components/oliv-map').then((module) => module.PropertyListMap), { ssr: false, loading: () => <MapSkeleton tall /> })
 const PropertyLocationMap = dynamic(() => import('@/components/oliv-map').then((module) => module.PropertyLocationMap), { ssr: false, loading: () => <MapSkeleton /> })
 const MapPicker = dynamic(() => import('@/components/oliv-map').then((module) => module.MapPicker), { ssr: false })
+const AreaRadiusEditor = dynamic(() => import('@/components/oliv-map').then((module) => module.AreaRadiusEditor), { ssr: false, loading: () => <MapSkeleton /> })
 
 // State filtering uses lib/oliv-data's full state list + city inference (stateForCity).
 const formatDate = (value?: string | Date | null) => value ? new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'
@@ -150,7 +151,7 @@ function PropertyCard({ id }: { id: string }) {
       <div className="p-4">
         <a href={`/listing/${id}`}>
           <h3 className="font-serif text-xl">{home.title}</h3>
-          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="size-3.5" />{home.location.city}, {home.location.address}</p>
+          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="size-3.5" />{home.location.area ? `${home.location.area}, ` : ''}{home.location.city}, {home.location.address}</p>
         </a>
         <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
           <span className="font-semibold">{formatNaira(home.price)}<small className="ml-1 font-normal text-muted-foreground">/ year</small></span>
@@ -163,16 +164,17 @@ function PropertyCard({ id }: { id: string }) {
 
 export function DiscoverPage() {
   const [query, setQuery] = useState('')
+  const [areaFilter, setAreaFilter] = useState('')
   const [mode, setMode] = useState<'list' | 'map'>('list')
-  const { homes, loading } = useOlivState()
+  const { homes, areas, loading } = useOlivState()
   const filtered = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
     return homes.filter((home) => {
       const haystack = `${home.title} ${home.location.city} ${home.location.state ?? ''} ${home.location.address}`.toLowerCase()
       const matchesQuery = !terms.length || terms.every((term) => haystack.includes(term))
-      return matchesQuery
+      return matchesQuery && (!areaFilter || home.location.area === areaFilter)
     })
-  }, [homes, query])
+  }, [homes, query, areaFilter])
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -193,7 +195,7 @@ export function DiscoverPage() {
             <Search className="size-4 text-muted-foreground" />
             <input aria-label={`Search ${OLIV_MARKET.city} homes`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${OLIV_MARKET.city} homes...`} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" />
           </div>
-          <div className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">{OLIV_MARKET.city}, {OLIV_MARKET.state}</div>
+          <select aria-label="Filter by Amassoma area" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All Amassoma areas</option>{areas.map((zone) => <option key={zone.name} value={zone.name}>{zone.name}</option>)}</select>
         </div>
         <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
           <span>{loading ? 'Loading Nigerian homes…' : `${filtered.length} home${filtered.length === 1 ? '' : 's'} found`}</span>
@@ -206,7 +208,7 @@ export function DiscoverPage() {
           </div>
         ) : (
           <div className="mt-4 pb-16">
-            {loading ? <MapSkeleton tall /> : <PropertyListMap homes={filtered} />}
+            {loading ? <MapSkeleton tall /> : <PropertyListMap homes={filtered} selectedArea={areaFilter} areas={areas} />}
           </div>
         )}
       </main>
@@ -215,7 +217,7 @@ export function DiscoverPage() {
 }
 
 export function ListingPage({ id = '' }: { id?: string }) {
-  const { homes, saved, toggleSaved, requests, requestViewing, sendInquiry, reviews, addReview, loading } = useOlivState()
+  const { homes, areas, saved, toggleSaved, requests, requestViewing, sendInquiry, reviews, addReview, loading } = useOlivState()
   const [viewDate, setViewDate] = useState('')
   const [viewTime, setViewTime] = useState('Morning')
   const [message, setMessage] = useState('')
@@ -276,12 +278,12 @@ export function ListingPage({ id = '' }: { id?: string }) {
               <img src={homeImage(home)} alt={`${home.title} main view`} className="aspect-[1.35/1] h-full w-full object-cover" />
               <img src={home.images?.[1] ?? homeImage(home)} alt="Interior detail" className="hidden h-full min-h-32 w-full object-cover sm:block" />
             </div>
-            <div className="mt-4"><PropertyLocationMap home={home} /></div>
+            <div className="mt-4"><PropertyLocationMap home={home} areas={areas} /></div>
             <div className="mt-5 flex items-start justify-between gap-4">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-widest text-accent-foreground">{home.verificationBadge ? 'Verified listing' : 'New listing'}</span>
                 <h1 className="mt-2 font-serif text-4xl">{home.title}</h1>
-                <p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="size-4" />{home.location.address}, {home.location.city}, {home.location.country}</p>
+                <p className="mt-2 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="size-4" />{home.location.area ? `${home.location.area}, ` : ''}{home.location.address}, {home.location.city}, {home.location.country}</p>
               </div>
               <button onClick={() => toggleSaved(id)} aria-label={isSaved ? 'Remove from saved homes' : 'Save this home'} className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-card"><Heart className={isSaved ? 'size-5 fill-accent-foreground text-accent-foreground' : 'size-5'} /></button>
             </div>
@@ -459,7 +461,7 @@ export function ProfilePage() {
 const STATUS_STEPS = ['Your identity', 'Agency details', 'Coverage & location'] as const
 
 export function AgentOnboardingPage() {
-  const { refresh } = useOlivState()
+  const { refresh, areas } = useOlivState()
   const [status, setStatus] = useState<'loading' | 'guest' | 'form' | 'pending' | 'verified' | 'suspended' | 'rejected'>('loading')
   const [step, setStep] = useState(0)
   const [name, setName] = useState('')
@@ -603,7 +605,7 @@ export function AgentOnboardingPage() {
               </div>
               <div>
                 <p className="text-sm font-medium">Office location <span className="font-normal text-muted-foreground">(optional)</span></p>
-                <div className="mt-2"><MapPicker value={office} onChange={setOffice} /></div>
+                <div className="mt-2"><MapPicker value={office} areas={areas} onChange={setOffice} /></div>
               </div>
             </div>
           )}
@@ -634,12 +636,14 @@ type AgentRequest = { _id: string; propertyId: string; propertyTitle?: string; u
 type AgentReview = { _id: string; propertyId: string; propertyTitle?: string; authorName: string; rating: number; text: string; status?: string; createdAt?: string }
 
 function AddListingForm({ property, onCreated, onCancel }: { property?: Property; onCreated: (property: Property) => void; onCancel: () => void }) {
+  const { areas } = useOlivState()
   const [title, setTitle] = useState(property?.title ?? '')
   const [description, setDescription] = useState(property?.description ?? '')
   const [type, setType] = useState<Property['type']>(property?.type ?? 'apartment')
   const [price, setPrice] = useState(property ? String(property.price) : '')
   const [address, setAddress] = useState(property?.location.address ?? '')
   const [city, setCity] = useState(property?.location.city ?? OLIV_MARKET.city)
+  const [area, setArea] = useState(property?.location.area ?? '')
   const [state, setState] = useState(property?.location.state ?? OLIV_MARKET.state)
   const [postalCode, setPostalCode] = useState(property?.location.postalCode ?? '')
   const [bedrooms, setBedrooms] = useState(property ? String(property.bedrooms) : '2')
@@ -682,7 +686,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
     try {
       const response = await fetch('/api/agent/properties', { method: property ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(property?._id ? { propertyId: property._id } : {}),
         title, description, type, price: Number(price),
-        location: { address, city, ...(state ? { state } : {}), postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
+        location: { address, city, ...(area ? { area } : {}), ...(state ? { state } : {}), postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
         bedrooms: Number(bedrooms), bathrooms: Number(bathrooms), squareMeters: Number(squareMeters),
         furnished, amenities: amenities.split(',').map((item) => item.trim()).filter(Boolean), images, published: true,
       }) })
@@ -729,6 +733,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">Street address<input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="201 Grand Key Loop East" className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">City<input value={city} onChange={(event) => setCity(event.target.value)} placeholder={OLIV_MARKET.city} className={field} /></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">Specific Amassoma area<select value={area} onChange={(event) => setArea(event.target.value)} className={field}><option value="">Select area…</option>{areas.map((zone) => <option key={zone.name} value={zone.name}>{zone.name}</option>)}</select></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium sm:col-span-2">State <span className="font-normal text-muted-foreground">(auto-filled when you pin the map)</span>
           <select value={state} onChange={(event) => setState(event.target.value)} className={field}><option value={OLIV_MARKET.state}>{OLIV_MARKET.state}</option></select>
         </label>
@@ -736,7 +741,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
       </div>
       <div className="mt-4">
         <p className="text-sm font-medium">Pin the location on the map <span className="font-normal text-muted-foreground">(optional — helps renters find you)</span></p>
-        <div className="mt-2"><MapPicker value={coordinates} onChange={(location) => { setCoordinates(location); if (location?.address && !address) setAddress(location.address); if (location?.city && !city) setCity(location.city); if (location?.state && !state) setState(location.state) }} /></div>
+        <div className="mt-2"><MapPicker value={coordinates} area={area} areas={areas} onChange={(location) => { setCoordinates(location); if (location?.address && !address) setAddress(location.address); if (location?.city && !city) setCity(location.city); if (location?.state && !state) setState(location.state) }} /></div>
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-4">
         <label className="flex flex-col gap-1.5 text-sm font-medium">Bedrooms<input value={bedrooms} onChange={(event) => setBedrooms(event.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" className={field} /></label>
@@ -755,6 +760,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
 }
 
 function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<AgentOverview['agent']>; onSaved: (agent: Record<string, unknown>) => void; onCancel: () => void }) {
+  const { areas } = useOlivState()
   const [companyName, setCompanyName] = useState(agent.agentCompanyName ?? '')
   const [licenseNumber, setLicenseNumber] = useState(agent.agentLicenseNumber ?? '')
   const [phone, setPhone] = useState(agent.phone ?? '')
@@ -804,7 +810,7 @@ function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<Ag
       </div>
       <div className="mt-4">
         <p className="text-sm font-medium">Office location <span className="font-normal text-muted-foreground">(shown to renters)</span></p>
-        <div className="mt-2"><MapPicker value={officeLocation} onChange={setOfficeLocation} /></div>
+        <div className="mt-2"><MapPicker value={officeLocation} areas={areas} onChange={setOfficeLocation} /></div>
       </div>
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-border pt-5">
         <button type="button" onClick={() => void save()} disabled={busy} className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? 'Saving…' : 'Save settings'}</button>
@@ -939,7 +945,7 @@ export function AgentDashboardPage() {
                 <div key={property._id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 last:border-b-0">
                   <div className="min-w-0">
                     <a href={`/listing/${property._id}`} className="font-medium hover:underline">{property.title}</a>
-                    <p className="text-xs text-muted-foreground">{property.location.city}{property.location.state ? `, ${property.location.state}` : ''} · {formatNaira(property.price)} / year</p>
+                    <p className="text-xs text-muted-foreground">{property.location.area ? `${property.location.area} · ` : ''}{property.location.city}{property.location.state ? `, ${property.location.state}` : ''} · {formatNaira(property.price)} / year</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${property.published ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>{property.published ? 'Published' : 'Draft'}</span>
@@ -1014,20 +1020,46 @@ export function AgentDashboardPage() {
 // __NEXT_ADMIN_QUEUE__
 
 type QueueAgent = { _id: string; name: string; email: string; phone?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { address?: string; city?: string; state?: string }; agentVerificationStatus?: string }
+type AdminArea = { name: string; description: string; center: { lat: number; lng: number }; radius: number }
 
 export function AdminDashboardPage() {
   const { user } = useOlivState()
   const [queue, setQueue] = useState<QueueAgent[]>([])
+  const [areas, setAreas] = useState<AdminArea[]>([])
+  const [areaForm, setAreaForm] = useState<AdminArea>({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 })
+  const [editingArea, setEditingArea] = useState('')
+  const [areaEditorOpen, setAreaEditorOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [denied, setDenied] = useState(false)
+  const [savingArea, setSavingArea] = useState(false)
   const load = () => {
     setLoading(true)
     fetch('/api/admin/verification').then(async (response) => {
       const result = await response.json().catch(() => ({}))
       if (!response.ok) { setDenied(true); return }
       setQueue(result.queue ?? [])
+      setAreas(result.areas ?? [])
     }).catch(() => setDenied(true)).finally(() => setLoading(false))
+  }
+  const saveArea = async () => {
+    setMessage('')
+    if (areaForm.name.trim().length < 2 || areaForm.description.trim().length < 4) { setMessage('Enter an area name and a short description.'); return }
+    if (!Number.isFinite(areaForm.center.lat) || !Number.isFinite(areaForm.center.lng) || !Number.isFinite(areaForm.radius) || areaForm.radius < 50 || areaForm.radius > 5000) { setMessage('Use valid coordinates and a radius between 50 and 5000 metres.'); return }
+    setSavingArea(true)
+    try {
+      const response = await fetch('/api/admin/areas', { method: editingArea ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: areaForm.name.trim(), description: areaForm.description.trim(), lat: areaForm.center.lat, lng: areaForm.center.lng, radius: areaForm.radius, ...(editingArea ? { originalName: editingArea } : {}) }) })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.area) { setMessage(result.error ?? 'The area could not be saved.'); return }
+      setAreas((items) => editingArea ? items.map((item) => item.name === editingArea ? result.area : item) : [...items, result.area])
+      setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }); setEditingArea(''); setAreaEditorOpen(false); setMessage('Area saved.')
+    } catch { setMessage('The area could not be saved. Check your connection and try again.') } finally { setSavingArea(false) }
+  }
+  const deleteArea = async (name: string) => {
+    if (!window.confirm(`Delete the ${name} area?`)) return
+    const response = await fetch(`/api/admin/areas?name=${encodeURIComponent(name)}`, { method: 'DELETE' }); const result = await response.json().catch(() => ({}))
+    if (!response.ok) { setMessage(result.error ?? 'Unable to delete area.'); return }
+    setAreas((items) => items.filter((item) => item.name !== name)); setMessage('Area deleted.')
   }
   useEffect(load, [])
   const act = async (userId: string, action: 'approve' | 'reject' | 'review' | 'suspend') => {
@@ -1045,6 +1077,27 @@ export function AdminDashboardPage() {
         <h1 className="mt-2 font-serif text-4xl">Agent verification queue</h1>
         <p className="mt-2 text-sm text-muted-foreground">Review agent applications, then approve or reject. Approved agents can publish listings immediately.</p>
         {message && <p role="status" className="mt-5 rounded-xl bg-muted px-4 py-3 text-sm">{message}</p>}
+        {!denied && <section className="mt-7 rounded-2xl border border-border bg-card p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-accent-foreground">Marketplace geography</p><h2 className="mt-1 font-serif text-2xl">Amassoma areas and radius</h2><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Manage the named areas used by filters and map circles.</p></div><button type="button" onClick={() => { setEditingArea(''); setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }); setAreaEditorOpen(true) }} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Add area</button></div>
+          <div className="hidden">
+            <AreaRadiusEditor center={areaForm.center} radius={areaForm.radius} onChange={(value) => setAreaForm((item) => ({ ...item, ...value }))} />
+            <div className="flex flex-col gap-3">
+              <label className="flex flex-col gap-1.5 text-sm font-semibold">Area name<input value={areaForm.name} onChange={(event) => setAreaForm((item) => ({ ...item, name: event.target.value }))} placeholder="CHS Area" className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label>
+              <label className="flex flex-col gap-1.5 text-sm font-semibold">Description<textarea value={areaForm.description} onChange={(event) => setAreaForm((item) => ({ ...item, description: event.target.value }))} rows={3} placeholder="Short description" className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label>
+              <div className="grid grid-cols-2 gap-3"><label className="flex flex-col gap-1.5 text-sm font-semibold">Latitude<input type="number" step="0.000001" value={areaForm.center.lat} onChange={(event) => setAreaForm((item) => ({ ...item, center: { ...item.center, lat: Number(event.target.value) } }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label><label className="flex flex-col gap-1.5 text-sm font-semibold">Longitude<input type="number" step="0.000001" value={areaForm.center.lng} onChange={(event) => setAreaForm((item) => ({ ...item, center: { ...item.center, lng: Number(event.target.value) } }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label></div>
+              <label className="flex flex-col gap-2 text-sm font-semibold">Radius: {areaForm.radius} metres<input type="range" min="50" max="5000" step="10" value={areaForm.radius} onChange={(event) => setAreaForm((item) => ({ ...item, radius: Number(event.target.value) }))} /><input type="number" min="50" max="5000" value={areaForm.radius} onChange={(event) => setAreaForm((item) => ({ ...item, radius: Number(event.target.value) }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label>
+              <div className="flex flex-wrap gap-2 pt-2"><button type="button" onClick={() => void saveArea()} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">{editingArea ? 'Save area changes' : 'Add area'}</button>{editingArea && <button type="button" onClick={() => { setEditingArea(''); setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }) }} className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold">Cancel</button>}</div>
+            </div>
+          </div>
+          {areas.length > 0 && <div className="mt-7 grid gap-3 sm:grid-cols-2">{areas.map((area) => <div key={area.name} className="rounded-xl border border-border p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{area.name}</p><p className="mt-1 text-xs text-muted-foreground">{area.description}</p></div><span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-semibold">{area.radius} m</span></div><p className="mt-3 text-xs text-muted-foreground">Center: {area.center.lat}, {area.center.lng}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => { setEditingArea(area.name); setAreaForm(area); setAreaEditorOpen(true) }} className="rounded-full border border-border px-3 py-1.5 text-xs font-semibold">Edit on map</button><button type="button" onClick={() => void deleteArea(area.name)} className="rounded-full border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700">Delete</button></div></div>)}</div>}
+          {areaEditorOpen && <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label={editingArea ? `Edit ${editingArea}` : 'Add Amassoma area'}>
+            <div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-2xl sm:p-7">
+              <div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-accent-foreground">Area editor</p><h3 className="mt-1 font-serif text-3xl">{editingArea ? `Edit ${editingArea}` : 'Add Amassoma area'}</h3><p className="mt-1 text-sm text-muted-foreground">Move the pin or adjust the radius. The circle updates immediately.</p></div><button type="button" aria-label="Close area editor" onClick={() => { setEditingArea(''); setAreaEditorOpen(false); setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }) }} className="grid size-10 place-items-center rounded-full border border-border text-xl">×</button></div>
+              <div className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_.85fr]"><AreaRadiusEditor center={areaForm.center} radius={areaForm.radius} onChange={(value) => setAreaForm((item) => ({ ...item, ...value }))} /><div className="flex flex-col gap-3"><label className="flex flex-col gap-1.5 text-sm font-semibold">Area name<input value={areaForm.name} onChange={(event) => setAreaForm((item) => ({ ...item, name: event.target.value }))} placeholder="CHS Area" className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label><label className="flex flex-col gap-1.5 text-sm font-semibold">Description<textarea value={areaForm.description} onChange={(event) => setAreaForm((item) => ({ ...item, description: event.target.value }))} rows={3} placeholder="Short description" className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label><div className="grid grid-cols-2 gap-3"><label className="flex flex-col gap-1.5 text-sm font-semibold">Latitude<input type="number" step="0.000001" value={areaForm.center.lat} onChange={(event) => setAreaForm((item) => ({ ...item, center: { ...item.center, lat: Number(event.target.value) } }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label><label className="flex flex-col gap-1.5 text-sm font-semibold">Longitude<input type="number" step="0.000001" value={areaForm.center.lng} onChange={(event) => setAreaForm((item) => ({ ...item, center: { ...item.center, lng: Number(event.target.value) } }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label></div><label className="flex flex-col gap-2 text-sm font-semibold">Radius: {areaForm.radius} metres<input type="range" min="50" max="5000" step="10" value={areaForm.radius} onChange={(event) => setAreaForm((item) => ({ ...item, radius: Number(event.target.value) }))} /><input type="number" min="50" max="5000" value={areaForm.radius} onChange={(event) => setAreaForm((item) => ({ ...item, radius: Number(event.target.value) }))} className="rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-normal" /></label></div></div>
+              <div className="mt-6 flex justify-end gap-2 border-t border-border pt-5"><button type="button" disabled={savingArea} onClick={() => { setEditingArea(''); setAreaEditorOpen(false); setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }) }} className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold disabled:opacity-50">Cancel</button><button type="button" disabled={savingArea} onClick={() => void saveArea()} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingArea ? 'Saving…' : editingArea ? 'Save changes' : 'Add area'}</button></div>
+            </div>
+          </div>}
+        </section>}
         {denied ? (
           <div className="mt-8 rounded-2xl border border-border bg-card p-10 text-center">
             <h2 className="font-serif text-2xl">Admin access required</h2>

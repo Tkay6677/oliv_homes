@@ -42,6 +42,7 @@ The application is intentionally local. It is not currently a nationwide marketp
 5. An agent can edit or delete only their own listings.
 6. Deleting a listing also removes its saved-property records, reviews, and viewing requests.
 7. Dark mode is the default. A visitor can switch to light mode with the header button.
+8. People can filter listings by named Amassoma micro-markets. The selected micro-market is shown as a radius on the map.
 
 ## 4. Technology used
 
@@ -178,6 +179,8 @@ The server checks permissions for every protected operation. A button being hidd
 | `AGENT` with `VERIFIED` status | Create, edit, delete owned listings and answer requests. |
 | `AGENT` not yet verified | Apply and view onboarding status, but cannot publish listings. |
 | `SUPER_ADMIN` | Review agent applications and perform platform administration. |
+
+Super admins also manage the Amassoma micro-market catalog. From `/admin`, they can add an area, change its name or description, click directly on the live map to move its center point, type exact latitude and longitude values, adjust a live radius slider, type the radius in metres, or delete the area. The saved catalog is shared by public discovery, listing detail maps, agent listing forms, and the agent workspace.
 
 ### Agent verification states
 
@@ -338,6 +341,27 @@ Important fields:
 - `price`: yearly rent in the current user interface.
 - `images`: HTTPS image URLs.
 - `coordinates`: the exact map point when the agent pins one.
+- `area`: the selected Amassoma micro-market, such as `CHS Area` or `Mango Street`.
+
+### Amassoma micro-markets
+
+The location filter uses a fixed shared catalog so that renters, agents, maps, seed data, and documentation use the same names:
+
+| Area | Simple description |
+|---|---|
+| CHS Area | College of Health Sciences and CHS Boys Hostels; a high-demand medical and clinical-student zone. |
+| Main Gate Axis | Properties immediately around the main university entrance. |
+| Tantua / Tantua Road | Premium neighbourhood opposite the late DSP Alamieyeseigha Estate. |
+| Mango Street | Student lodges known for stronger water infrastructure. |
+| Mango Street Junction | Busy commercial and transport strip leading into Mango Street. |
+| Ogbopina | Student-heavy area with shops and viewing centres. |
+| Abenikiri (Ibenikiri) | Populated and calmer residential settlement. |
+| Okori-Ama | Fast-growing student community with competitive land activity. |
+| Agbedi-Ama | Densely populated and budget-friendly student housing area. |
+| Efeke-Ama | Historic royal quarter with lodges and family compounds. |
+| Ogoun-Ama | Expanding outer zone with new lodge construction. |
+
+The catalog stores an approximate center and radius for each area. These are discovery boundaries, not legal property boundaries or land surveys. The supplied local-market notes identify CHS as a particularly important student and medical-campus hub.
 
 #### `sessions`
 
@@ -417,7 +441,7 @@ sequenceDiagram
 
 | Method | Route | Description |
 |---|---|---|
-| `GET` | `/api/properties` | Get published Amassoma listings. Supports search, city, type, page, and limit. |
+| `GET` | `/api/properties` | Get published Amassoma listings. Supports search, area, city, type, page, and limit. |
 | `GET` | `/api/reviews` | Get visible reviews. |
 | `POST` | `/api/reviews` | Submit a signed-in user's review. |
 | `GET` | `/api/favorites` | Get the signed-in user's saved homes. |
@@ -436,6 +460,8 @@ sequenceDiagram
 | `GET/PATCH` | `/api/agent/requests` | Read and answer renter requests. |
 | `GET` | `/api/agent/reviews` | Read reviews for the agent's listings. |
 | `GET/PATCH` | `/api/admin/verification` | Review and update agent verification. |
+| `GET` | `/api/areas` | Read the current public Amassoma area catalog. |
+| `GET/POST/PATCH/DELETE` | `/api/admin/areas` | Read or manage areas and radius settings as a super admin. |
 
 ## 12. Local setup for a non-developer
 
@@ -515,8 +541,41 @@ The map can:
 - Show one listing in detail.
 - Let an agent search for or click an office/listing location.
 - Reverse-geocode a clicked point into an address, town, and state.
+- Draw the selected micro-market as a visible radius circle.
+- Show the saved listing area radius on listing detail maps.
+- Show the chosen area radius while an agent pins a listing location.
+
+The same zone catalog powers the discovery filter, public maps, agent listing form, agent workspace labels, API validation, and seed data. This prevents a renter seeing one spelling while an agent sees another.
+
+### Area administration flow
+
+```mermaid
+sequenceDiagram
+	participant Admin as Super admin
+	participant Screen as Admin area panel
+	participant API as Admin area API
+	participant DB as MongoDB marketAreas
+	participant Users as Public and agent screens
+
+	Admin->>Screen: Add, edit, or delete an area
+	Screen->>API: Send area name, description, center, and radius
+	API->>API: Check super-admin role and validate radius
+	API->>DB: Save or remove the area
+	DB-->>API: Updated catalog
+	API-->>Screen: Success and updated area
+	Users->>API: Request current area catalog
+	API-->>Users: Same names and radius settings
+```
 
 Map location is helpful but should not be treated as a legal boundary or property survey. Listing addresses and coordinates should be checked by the agent before publishing.
+
+### Map data limitation
+
+Map coverage and place-name data for Amassoma are not as complete or precise as map data for larger cities. Some roads, hostels, junctions, compounds, and local landmarks may be missing, have a different spelling, or appear in a slightly different position. This can make map navigation and search more difficult, especially around student areas and newer developments.
+
+The area circles in OLIV are therefore **approximate discovery guides**, not official boundaries. A circle helps people search around a known micro-market, but it does not prove that a property is inside a neighbourhood or show the exact route to a building. A map pin can also be less accurate when the mapping service has limited local information.
+
+Agents should confirm the written address, nearest landmark, access road, and map pin with local knowledge before publishing. Renters should contact the agent for directions when a route, road name, or landmark is unclear. OLIV should not be used as the only source for travel directions, surveying, land ownership, emergency response, or legal property boundaries.
 
 ## 15. Dark mode
 

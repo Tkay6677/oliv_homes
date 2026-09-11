@@ -7,6 +7,22 @@ export const OLIV_MARKET = {
   center: { lat: 4.9730872, lng: 6.1089697 },
 } as const
 
+export type AmassomaZone = { name: string; description: string; center: { lat: number; lng: number }; radius: number }
+export const AMASSOMA_ZONES: AmassomaZone[] = [
+  { name: 'CHS Area', description: 'College of Health Sciences and CHS Boys Hostels', center: { lat: 4.982, lng: 6.103 }, radius: 420 },
+  { name: 'Main Gate Axis', description: 'Homes around the main Niger Delta University entrance', center: { lat: 4.978, lng: 6.111 }, radius: 420 },
+  { name: 'Tantua / Tantua Road', description: 'Premium area opposite the late DSP Alamieyeseigha Estate', center: { lat: 4.969, lng: 6.116 }, radius: 500 },
+  { name: 'Mango Street', description: 'Popular student lodges with stronger water infrastructure', center: { lat: 4.965, lng: 6.107 }, radius: 360 },
+  { name: 'Mango Street Junction', description: 'Commercial and transport entrance to Mango Street', center: { lat: 4.963, lng: 6.111 }, radius: 300 },
+  { name: 'Ogbopina', description: 'Busy student neighbourhood with shops and viewing centres', center: { lat: 4.973, lng: 6.116 }, radius: 430 },
+  { name: 'Abenikiri (Ibenikiri)', description: 'Calmer, populated residential settlement', center: { lat: 4.967, lng: 6.099 }, radius: 430 },
+  { name: 'Okori-Ama', description: 'Fast-growing student community', center: { lat: 4.956, lng: 6.105 }, radius: 480 },
+  { name: 'Agbedi-Ama', description: 'Densely populated, budget-friendly student housing', center: { lat: 4.958, lng: 6.115 }, radius: 420 },
+  { name: 'Efeke-Ama', description: 'Historic royal quarter with lodges and family compounds', center: { lat: 4.979, lng: 6.118 }, radius: 400 },
+  { name: 'Ogoun-Ama', description: 'Expanding outer zone with new lodge construction', center: { lat: 4.95, lng: 6.12 }, radius: 520 },
+]
+export const getAmassomaZone = (name?: string | null) => AMASSOMA_ZONES.find((zone) => zone.name === name)
+
 export const nigerianStates = ['Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'] as const
 
 // Known major cities per state — used to infer the state of listings that only record a city.

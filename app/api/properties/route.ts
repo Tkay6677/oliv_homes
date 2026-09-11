@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const params = request.nextUrl.searchParams
     const query = textQuery(params.get('q'), 80)
     const city = textQuery(params.get('city'), 80)
+    const area = textQuery(params.get('area'), 80)
     const type = textQuery(params.get('type'), 30)
     const page = parsePage(params.get('page'))
     const limit = parseLimit(params.get('limit'))
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
       filter.$or = [{ title: pattern }, { description: pattern }, { 'location.city': pattern }, { 'location.address': pattern }]
     }
     if (city && city.toLowerCase() === OLIV_MARKET.city.toLowerCase()) filter['location.city'] = new RegExp(`^${escapeRegex(city)}$`, 'i')
+    if (area) filter['location.area'] = new RegExp(`^${escapeRegex(area)}$`, 'i')
     if (type && ['apartment', 'house', 'studio', 'townhouse', 'shared'].includes(type)) filter.type = type
 
     const db = await getMongoDb()

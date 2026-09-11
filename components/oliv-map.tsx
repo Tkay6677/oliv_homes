@@ -3,12 +3,12 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
-import { formatNaira, OLIV_MARKET } from '@/lib/oliv-data'
+import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { formatNaira, getAmassomaZone, OLIV_MARKET, type AmassomaZone } from '@/lib/oliv-data'
 
 export type MapPoint = { lat: number; lng: number }
 export type PickedLocation = MapPoint & { address?: string; city?: string; state?: string }
-export type MapHome = { _id?: string; title: string; price: number; location: { address?: string; city?: string; coordinates?: MapPoint | null } }
+export type MapHome = { _id?: string; title: string; price: number; location: { address?: string; city?: string; area?: string; coordinates?: MapPoint | null } }
 
 const AMASSOMA_CENTER: MapPoint = OLIV_MARKET.center
 
@@ -59,6 +59,12 @@ function ClickPicker({ onPick }: { onPick: (point: MapPoint) => void }) {
   return null
 }
 
+function Recenter({ point }: { point: MapPoint }) {
+  const map = useMap()
+  useEffect(() => { map.setView(point, map.getZoom(), { animate: true }) }, [map, point])
+  return null
+}
+
 function MapShell({ center, zoom = 14, children }: { center?: MapPoint; zoom?: number; children: React.ReactNode }) {
   return (
     <MapContainer center={center ?? AMASSOMA_CENTER} zoom={zoom} scrollWheelZoom={false} className="h-full w-full" attributionControl>
@@ -67,18 +73,20 @@ function MapShell({ center, zoom = 14, children }: { center?: MapPoint; zoom?: n
     </MapContainer>
   )
 }
-export function PropertyListMap({ homes }: { homes: MapHome[] }) {
+export function PropertyListMap({ homes, selectedArea, areas }: { homes: MapHome[]; selectedArea?: string; areas?: AmassomaZone[] }) {
   const points = useMemo(() => homes.filter((home) => home.location?.coordinates).map((home) => home.location.coordinates!), [homes])
-  if (!points.length) return <div className="grid min-h-72 place-items-center rounded-2xl border border-border bg-muted text-sm text-muted-foreground">No mapped listings in this view yet.</div>
+  const zone = (areas ?? []).find((item) => item.name === selectedArea) ?? getAmassomaZone(selectedArea)
+  if (!points.length && !zone) return <div className="grid min-h-72 place-items-center rounded-2xl border border-border bg-muted text-sm text-muted-foreground">No mapped listings in this view yet.</div>
   return (
     <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border shadow-sm">
       <MapShell>
         <FitPoints points={points} />
+        {zone && <Circle center={zone.center} radius={zone.radius} pathOptions={{ color: '#d8ab52', fillColor: '#d8ab52', fillOpacity: 0.18, weight: 2 }} />}
         {homes.filter((home) => home.location?.coordinates).map((home) => (
           <Marker key={home._id ?? home.title} position={[home.location.coordinates!.lat, home.location.coordinates!.lng]} icon={pinIcon('primary')}>
             <Popup>
               <strong className="font-serif">{home.title}</strong><br />
-              <span>{home.location.city ?? OLIV_MARKET.city}</span><br />
+              <span>{home.location.area ?? home.location.city ?? OLIV_MARKET.city}</span><br />
               <span className="font-semibold">{formatNaira(home.price)} / year</span><br />
               <a href={`/listing/${home._id}`} className="underline">View listing</a>
             </Popup>
@@ -90,13 +98,14 @@ export function PropertyListMap({ homes }: { homes: MapHome[] }) {
   )
 }
 
-export function PropertyLocationMap({ home }: { home: MapHome }) {
+export function PropertyLocationMap({ home, areas }: { home: MapHome; areas?: AmassomaZone[] }) {
   if (!home.location?.coordinates) return <div className="grid min-h-64 place-items-center rounded-2xl border border-border bg-muted text-sm text-muted-foreground">Precise map location coming soon for this listing.</div>
   const point = formatPoint(home.location.coordinates)
   return (
     <div className="relative h-64 overflow-hidden rounded-2xl border border-border shadow-sm">
       <MapShell center={point} zoom={15}>
         <FitPoints points={[point]} />
+        {home.location.area && (areas ?? []).find((item) => item.name === home.location.area) && <Circle center={(areas ?? []).find((item) => item.name === home.location.area)!.center} radius={(areas ?? []).find((item) => item.name === home.location.area)!.radius} pathOptions={{ color: '#d8ab52', fillColor: '#d8ab52', fillOpacity: 0.16, weight: 2 }} />}
         <Marker position={[point.lat, point.lng]} icon={pinIcon('accent')}>
           <Popup><strong className="font-serif">{home.title}</strong><br />{home.location.address ?? ''} {home.location.city ?? ''}</Popup>
         </Marker>
@@ -105,7 +114,7 @@ export function PropertyLocationMap({ home }: { home: MapHome }) {
     </div>
   )
 }
-export function MapPicker({ value, onChange }: { value: PickedLocation | null; onChange: (location: PickedLocation | null) => void }) {
+export function MapPicker({ value, onChange, area, areas }: { value: PickedLocation | null; onChange: (location: PickedLocation | null) => void; area?: string; areas?: AmassomaZone[] }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PickedLocation[]>([])
   const [open, setOpen] = useState(false)
@@ -146,6 +155,7 @@ export function MapPicker({ value, onChange }: { value: PickedLocation | null; o
       <div className='relative h-64 overflow-hidden rounded-2xl border border-border shadow-sm'>
         <MapShell center={value ? formatPoint(value) : undefined} zoom={value ? 15 : 14}>
           <ClickPicker onPick={(point) => void pick(point)} />
+          {area && (areas ?? []).find((item) => item.name === area) && <Circle center={(areas ?? []).find((item) => item.name === area)!.center} radius={(areas ?? []).find((item) => item.name === area)!.radius} pathOptions={{ color: '#d8ab52', fillColor: '#d8ab52', fillOpacity: 0.16, weight: 2 }} />}
           {value && <FitPoints points={[formatPoint(value)]} />}
           {value && <Marker position={[value.lat, value.lng]} icon={pinIcon('accent')} />}
         </MapShell>
@@ -154,6 +164,20 @@ export function MapPicker({ value, onChange }: { value: PickedLocation | null; o
       {value ? (
         <p className='text-xs text-muted-foreground'>Selected: {value.address ?? 'Custom pin'}{value.city ? `, ${value.city}` : ''}{value.state ? `, ${value.state}` : ''} · {value.lat}, {value.lng} <button type='button' onClick={() => onChange(null)} className='ml-2 underline'>Clear</button></p>
       ) : <p className='text-xs text-muted-foreground'>Optional — pin your office or a landmark renters would know.</p>}
+    </div>
+  )
+}
+
+export function AreaRadiusEditor({ center, radius, onChange }: { center: MapPoint; radius: number; onChange: (value: { center: MapPoint; radius: number }) => void }) {
+  return (
+    <div className="relative h-80 overflow-hidden rounded-2xl border border-border">
+      <MapShell center={center} zoom={15}>
+        <Recenter point={center} />
+        <ClickPicker onPick={(point) => onChange({ center: point, radius })} />
+        <Circle center={center} radius={radius} pathOptions={{ color: '#d8ab52', fillColor: '#d8ab52', fillOpacity: 0.24, weight: 3 }} />
+        <Marker position={[center.lat, center.lng]} icon={pinIcon('accent')} />
+      </MapShell>
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-full bg-card/90 px-3 py-1.5 text-xs font-medium backdrop-blur">Click the map to move the area center</div>
     </div>
   )
 }

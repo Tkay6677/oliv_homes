@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { Property } from './types'
-import { OLIV_MARKET, olivHomes as seededHomes } from './oliv-data'
+import { AMASSOMA_ZONES, OLIV_MARKET, type AmassomaZone, olivHomes as seededHomes } from './oliv-data'
 
 type Review = { _id?: string; id?: string; propertyId: string; author?: string; authorName?: string; rating: number; text: string; status?: string; createdAt?: string }
 type User = { _id?: string; name: string; email: string; role: 'USER' | 'AGENT' | 'SUPER_ADMIN'; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
@@ -13,6 +13,7 @@ type State = {
   reviews: Review[]
   requests: ViewingRequest[]
   homes: Property[]
+  areas: AmassomaZone[]
   user: User | null
   loading: boolean
   notifications: NotificationItem[]
@@ -29,6 +30,7 @@ const Context = createContext<State | null>(null)
 
 export function OlivStateProvider({ children }: { children: React.ReactNode }) {
   const [homes, setHomes] = useState<Property[]>([])
+  const [areas, setAreas] = useState<AmassomaZone[]>(AMASSOMA_ZONES)
   const [saved, setSaved] = useState<string[]>([])
   const [reviews, setReviews] = useState<Review[]>([])
   const [requests, setRequests] = useState<ViewingRequest[]>([])
@@ -60,12 +62,14 @@ export function OlivStateProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [properties, auth, reviewItems] = await Promise.all([
+      const [properties, auth, reviewItems, areaItems] = await Promise.all([
         fetch(`/api/properties?city=${encodeURIComponent(OLIV_MARKET.city)}&limit=200`).then((r) => r.ok ? r.json() : { items: [] }),
         fetch('/api/auth').then((r) => r.ok ? r.json() : { user: null }),
         fetch('/api/reviews').then((r) => r.ok ? r.json() : { items: [] }),
+        fetch('/api/areas').then((r) => r.ok ? r.json() : { areas: AMASSOMA_ZONES }),
       ])
       setHomes(properties.items ?? [])
+      setAreas(Array.isArray(areaItems.areas) ? areaItems.areas : AMASSOMA_ZONES)
       setReviews(reviewItems.items ?? [])
       setUser(auth.user ?? null)
       if (auth.user?._id) {
@@ -112,7 +116,7 @@ export function OlivStateProvider({ children }: { children: React.ReactNode }) {
     if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error ?? 'Unable to send message') }
     setRequests((items) => [{ propertyId, type: 'INQUIRY', status: 'PENDING', message, createdAt: new Date().toISOString() }, ...items])
   }, [])
-  const value = useMemo(() => ({ saved, reviews, requests, homes, user, loading, notifications, unread, toggleSaved, addReview, requestViewing, sendInquiry, markNotificationRead, markAllNotificationsRead, refresh }), [saved, reviews, requests, homes, user, loading, notifications, unread, toggleSaved, addReview, requestViewing, sendInquiry, markNotificationRead, markAllNotificationsRead, refresh])
+  const value = useMemo(() => ({ saved, reviews, requests, homes, areas, user, loading, notifications, unread, toggleSaved, addReview, requestViewing, sendInquiry, markNotificationRead, markAllNotificationsRead, refresh }), [saved, reviews, requests, homes, areas, user, loading, notifications, unread, toggleSaved, addReview, requestViewing, sendInquiry, markNotificationRead, markAllNotificationsRead, refresh])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }
 export function useOlivState() { const value = useContext(Context); if (!value) throw new Error('useOlivState must be used inside OlivStateProvider'); return value }

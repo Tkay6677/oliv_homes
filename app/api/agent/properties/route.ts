@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
 import { createAgentProperty, deleteAgentProperty, listAgentProperties, updateAgentProperty } from '@/lib/oliv-db'
-import { OLIV_MARKET } from '@/lib/oliv-data'
+import { getAmassomaZone, OLIV_MARKET } from '@/lib/oliv-data'
 import type { Property } from '@/lib/types'
 
 export const runtime = 'nodejs'
@@ -18,11 +18,15 @@ const parseInput = (body: Record<string, unknown>) => {
   return {
     title: asText(body.title, 120), description: asText(body.description, 4000), type: PROPERTY_TYPES.includes(body.type as Property['type']) ? body.type as Property['type'] : null,
     price: asInt(body.price),
-    location: { address: asText(locationBody.address, 200), city: asText(locationBody.city, 60), state: asText(locationBody.state, 60), postalCode: asText(locationBody.postalCode, 12), country: 'Nigeria', ...(coordinates ? { coordinates } : {}) },
+    location: { address: asText(locationBody.address, 200), city: asText(locationBody.city, 60), ...(typeof locationBody.area === 'string' && getAmassomaZone(locationBody.area) ? { area: locationBody.area } : {}), state: asText(locationBody.state, 60), postalCode: asText(locationBody.postalCode, 12), country: 'Nigeria', ...(coordinates ? { coordinates } : {}) },
     bedrooms: asInt(body.bedrooms), bathrooms: asInt(body.bathrooms), squareMeters: asInt(body.squareMeters), furnished: Boolean(body.furnished),
     amenities: Array.isArray(body.amenities) ? body.amenities.map((item: unknown) => asText(item, 40)).filter(Boolean).slice(0, 15) : [],
     images: Array.isArray(body.images) ? body.images.map((item: unknown) => asText(item, 500)).filter((item: string) => /^https:\/\//.test(item)).slice(0, 12) : [], published: body.published === false ? false : true,
   }
+}
+const invalidArea = (body: Record<string, unknown>) => {
+  const location = (body.location ?? {}) as Record<string, unknown>
+  return typeof location.area === 'string' && location.area.trim().length > 0 && !getAmassomaZone(location.area.trim())
 }
 const validateInput = (input: ReturnType<typeof parseInput>) => {
   if (input.title.length < 4) return 'Give the listing a title of at least 4 characters.'
@@ -55,6 +59,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null)
     if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
 
+    if (invalidArea(body as Record<string, unknown>)) return NextResponse.json({ error: 'Choose a valid Amassoma area.' }, { status: 400 })
     const input = parseInput(body as Record<string, unknown>); const validationError = validateInput(input)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
     const property = await createAgentProperty(user._id!.toString(), { ...input, type: input.type! })
@@ -69,6 +74,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json().catch(() => null) as Record<string, unknown> | null
     const propertyId = typeof body?.propertyId === 'string' ? body.propertyId : ''
     if (!body || !propertyId) return NextResponse.json({ error: 'Listing id is required.' }, { status: 400 })
+    if (invalidArea(body)) return NextResponse.json({ error: 'Choose a valid Amassoma area.' }, { status: 400 })
     const input = parseInput(body); const validationError = validateInput(input)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
     return NextResponse.json({ property: await updateAgentProperty(user._id!.toString(), propertyId, { ...input, type: input.type! }) })

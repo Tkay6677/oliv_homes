@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
-import { listAgentsForReview, setAgentVerification } from '@/lib/oliv-db'
+import { listAgentsForReview, listAmassomaZones, setAgentVerification } from '@/lib/oliv-db'
 
 export const runtime = 'nodejs'
 
@@ -9,8 +9,8 @@ export async function GET() {
     const user = await currentUser()
     if (!user) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 })
     if (user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Super admin access required.' }, { status: 403 })
-    const queue = await listAgentsForReview()
-    return NextResponse.json({ queue })
+    const [queue, areas] = await Promise.all([listAgentsForReview(), listAmassomaZones()])
+    return NextResponse.json({ queue, areas })
   } catch (error) { console.error('[oliv] verification queue failed:', error); return NextResponse.json({ error: 'Unable to load verification queue.' }, { status: 500 }) }
 }
 
