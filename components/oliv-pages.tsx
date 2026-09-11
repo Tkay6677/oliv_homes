@@ -165,16 +165,23 @@ function PropertyCard({ id }: { id: string }) {
 export function DiscoverPage() {
   const [query, setQuery] = useState('')
   const [areaFilter, setAreaFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
   const [mode, setMode] = useState<'list' | 'map'>('list')
   const { homes, areas, loading } = useOlivState()
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    setQuery(params.get('q') ?? '')
+    setAreaFilter(params.get('area') ?? '')
+    setTypeFilter(params.get('type') ?? '')
+  }, [])
   const filtered = useMemo(() => {
     const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
     return homes.filter((home) => {
       const haystack = `${home.title} ${home.location.city} ${home.location.state ?? ''} ${home.location.address}`.toLowerCase()
       const matchesQuery = !terms.length || terms.every((term) => haystack.includes(term))
-      return matchesQuery && (!areaFilter || home.location.area === areaFilter)
+      return matchesQuery && (!areaFilter || home.location.area === areaFilter) && (!typeFilter || home.type === typeFilter)
     })
-  }, [homes, query, areaFilter])
+  }, [homes, query, areaFilter, typeFilter])
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -196,6 +203,7 @@ export function DiscoverPage() {
             <input aria-label={`Search ${OLIV_MARKET.city} homes`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${OLIV_MARKET.city} homes...`} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" />
           </div>
           <select aria-label="Filter by Amassoma area" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All Amassoma areas</option>{areas.map((zone) => <option key={zone.name} value={zone.name}>{zone.name}</option>)}</select>
+          <select aria-label="Filter by property type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All property types</option>{['apartment', 'house', 'studio', 'townhouse', 'shared'].map((type) => <option key={type} value={type} className="capitalize">{type}</option>)}</select>
         </div>
         <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
           <span>{loading ? 'Loading Nigerian homes…' : `${filtered.length} home${filtered.length === 1 ? '' : 's'} found`}</span>
