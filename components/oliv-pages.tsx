@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Bell, BellDot, Building2, CalendarDays, Check, Heart, ImagePlus, LogOut, Map, MapPin, Menu, MessageCircle, Moon, Plus, Search, Settings, ShieldCheck, Star, Sun, Trash2, UserCircle, X } from 'lucide-react'
-import { formatNaira, homeImage, nigerianStates, OLIV_MARKET } from '@/lib/oliv-data'
+import { formatNaira, homeImage, nigerianStates, OLIV_MARKET, PROPERTY_CATEGORIES } from '@/lib/oliv-data'
 import { useOlivState } from '@/lib/oliv-client-state'
 import type { PickedLocation } from '@/components/oliv-map'
 import type { Property } from '@/lib/types'
@@ -203,7 +203,7 @@ export function DiscoverPage() {
             <input aria-label={`Search ${OLIV_MARKET.city} homes`} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${OLIV_MARKET.city} homes...`} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" />
           </div>
           <select aria-label="Filter by Amassoma area" value={areaFilter} onChange={(event) => setAreaFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All Amassoma areas</option>{areas.map((zone) => <option key={zone.name} value={zone.name}>{zone.name}</option>)}</select>
-          <select aria-label="Filter by property type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All property types</option>{['apartment', 'house', 'studio', 'townhouse', 'shared'].map((type) => <option key={type} value={type} className="capitalize">{type}</option>)}</select>
+          <select aria-label="Filter by property type" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className="max-w-56 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none"><option value="">All property types</option>{PROPERTY_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select>
         </div>
         <div className="mt-6 flex items-center justify-between text-sm text-muted-foreground">
           <span>{loading ? 'Loading Nigerian homes…' : `${filtered.length} home${filtered.length === 1 ? '' : 's'} found`}</span>
@@ -300,7 +300,7 @@ export function ListingPage({ id = '' }: { id?: string }) {
               <span className="rounded-full bg-muted px-3 py-1.5">{home.bathrooms} bathrooms</span>
               <span className="rounded-full bg-muted px-3 py-1.5">{home.squareMeters} m²</span>
               <span className="rounded-full bg-muted px-3 py-1.5">{home.furnished ? 'Furnished' : 'Unfurnished'}</span>
-              <span className="rounded-full bg-muted px-3 py-1.5 capitalize">{home.type}</span>
+              <span className="rounded-full bg-muted px-3 py-1.5">{PROPERTY_CATEGORIES.find((category) => category.value === home.type)?.label ?? home.type}</span>
             </div>
             <p className="mt-5 font-serif text-3xl">{formatNaira(home.price)}<small className="ml-2 text-sm font-normal text-muted-foreground">/ year</small></p>
             <p className="mt-5 leading-relaxed text-muted-foreground">{home.description}</p>
@@ -647,7 +647,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
   const { areas } = useOlivState()
   const [title, setTitle] = useState(property?.title ?? '')
   const [description, setDescription] = useState(property?.description ?? '')
-  const [type, setType] = useState<Property['type']>(property?.type ?? 'apartment')
+  const [type, setType] = useState<Property['type']>(property?.type ?? PROPERTY_CATEGORIES[0].value)
   const [price, setPrice] = useState(property ? String(property.price) : '')
   const [address, setAddress] = useState(property?.location.address ?? '')
   const [city, setCity] = useState(property?.location.city ?? OLIV_MARKET.city)
@@ -714,7 +714,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-1.5 text-sm font-medium">Title<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Riverside three-bedroom apartment" className={field} /></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Yearly price (₦)<input value={price} onChange={(event) => setPrice(event.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" placeholder="1250000" className={field} /></label>
-        <label className="flex flex-col gap-1.5 text-sm font-medium">Property type<select value={type} onChange={(event) => setType(event.target.value as Property['type'])} className={field}>{['apartment', 'house', 'studio', 'townhouse', 'shared'].map((option) => <option key={option} value={option} className="capitalize">{option}</option>)}</select></label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium">House category<select value={type} onChange={(event) => setType(event.target.value as Property['type'])} className={field}>{PROPERTY_CATEGORIES.map((category) => <option key={category.value} value={category.value}>{category.label}</option>)}</select></label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Amenities (comma separated)<input value={amenities} onChange={(event) => setAmenities(event.target.value)} placeholder="24/7 security, Parking, Generator" className={field} /></label>
       </div>
       <label className="mt-4 flex flex-col gap-1.5 text-sm font-medium">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={4} placeholder="Describe the home, the neighbourhood, and what makes it special…" className={field} /></label>

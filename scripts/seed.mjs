@@ -34,7 +34,7 @@ const properties = [
   {
     slug: 'amassoma-riverside-court', agentId, title: 'Amassoma Riverside Court',
     description: 'A bright three-bedroom family apartment with reliable water, secure parking and easy access to central Amassoma.',
-    type: 'apartment', price: 1250000, currency: 'NGN',
+    type: 'furnished-apartment', price: 1250000, currency: 'NGN',
     location: { address: 'Amassoma Waterfront Road', city: 'Amassoma', area: 'Mango Street', state: 'Bayelsa', postalCode: '560001', country: 'Nigeria', coordinates: { lat: 4.9730872, lng: 6.1089697 } },
     bedrooms: 3, bathrooms: 3, squareMeters: 185, furnished: true, amenities: ['24/7 security', 'Parking', 'Water supply'],
     images: ['https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1400&q=85'], verificationBadge: true, published: true,
@@ -42,7 +42,7 @@ const properties = [
   {
     slug: 'ndu-road-family-home', agentId, title: 'NDU Road Family Home',
     description: 'A spacious four-bedroom home in a quiet compound near Niger Delta University, suitable for families and visiting professionals.',
-    type: 'house', price: 8500000, currency: 'NGN',
+    type: 'four-plus-bedroom-flat-house', price: 8500000, currency: 'NGN',
     location: { address: 'NDU Road, Amassoma', city: 'Amassoma', area: 'Main Gate Axis', state: 'Bayelsa', postalCode: '560001', country: 'Nigeria', coordinates: { lat: 4.9700642, lng: 6.1020796 } },
     bedrooms: 4, bathrooms: 4, squareMeters: 260, furnished: false, amenities: ['Gated compound', 'Generator', 'Family lounge'],
     images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=85'], verificationBadge: true, published: true,
@@ -50,7 +50,7 @@ const properties = [
   {
     slug: 'scholars-lodge-amassoma', agentId, title: 'Scholars Lodge Amassoma',
     description: 'A furnished two-bedroom lodge with a practical layout for lecturers, postgraduate students and working professionals.',
-    type: 'studio', price: 900000, currency: 'NGN',
+    type: 'self-contain', price: 900000, currency: 'NGN',
     location: { address: 'University Community Road, Amassoma', city: 'Amassoma', area: 'CHS Area', state: 'Bayelsa', postalCode: '560001', country: 'Nigeria', coordinates: { lat: 4.9761, lng: 6.1132 } },
     bedrooms: 2, bathrooms: 2, squareMeters: 95, furnished: true, amenities: ['Furnished', 'Prepaid meter', 'Internet ready'],
     images: ['https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=1400&q=85'], verificationBadge: true, published: true,

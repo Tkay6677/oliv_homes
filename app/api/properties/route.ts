@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { getMongoDb } from '@/lib/mongodb'
 import { ensureOlivIndexes } from '@/lib/mongodb-indexes'
 import { escapeRegex, ok, parseLimit, parsePage, serverError, textQuery } from '@/lib/authz'
-import { OLIV_MARKET } from '@/lib/oliv-data'
+import { OLIV_MARKET, PROPERTY_CATEGORIES } from '@/lib/oliv-data'
 import type { Property } from '@/lib/types'
 
 export const runtime = 'nodejs'
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
     if (city && city.toLowerCase() === OLIV_MARKET.city.toLowerCase()) filter['location.city'] = new RegExp(`^${escapeRegex(city)}$`, 'i')
     if (area) filter['location.area'] = new RegExp(`^${escapeRegex(area)}$`, 'i')
-    if (type && ['apartment', 'house', 'studio', 'townhouse', 'shared'].includes(type)) filter.type = type
+    if (type && PROPERTY_CATEGORIES.some((category) => category.value === type)) filter.type = type
 
     const db = await getMongoDb()
     await ensureOlivIndexes(db)

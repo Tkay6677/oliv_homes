@@ -23,6 +23,24 @@ export const AMASSOMA_ZONES: AmassomaZone[] = [
 ]
 export const getAmassomaZone = (name?: string | null) => AMASSOMA_ZONES.find((zone) => zone.name === name)
 
+export const PROPERTY_CATEGORIES = [
+  { value: 'single-room', label: 'Single Room', description: 'One room, usually with shared toilet or kitchen facilities.' },
+  { value: 'self-contain', label: 'Self-Contain', description: 'One room with a private toilet, bathroom, and usually a small kitchenette.' },
+  { value: 'room-and-parlour-self-contain', label: 'Room & Parlour Self-Contain', description: 'Bedroom, private sitting room, and private toilet or bathroom.' },
+  { value: 'one-bedroom-flat', label: '1 Bedroom Flat', description: 'Bedroom, living room, kitchen, and bathroom or toilet.' },
+  { value: 'two-bedroom-flat', label: '2 Bedroom Flat', description: 'Two bedrooms, living room, kitchen, and bathroom or toilet.' },
+  { value: 'three-bedroom-flat', label: '3 Bedroom Flat', description: 'Three bedrooms, living room, kitchen, and bathroom or toilet.' },
+  { value: 'four-plus-bedroom-flat-house', label: '4+ Bedroom Flat/House', description: 'Larger family or group accommodation.' },
+  { value: 'duplex', label: 'Duplex', description: 'A multi-floor residential house.' },
+  { value: 'bungalow', label: 'Bungalow', description: 'A single-floor standalone house.' },
+  { value: 'shared-apartment', label: 'Shared Apartment', description: 'Multiple tenants sharing a flat or house.' },
+  { value: 'hostel', label: 'Hostel', description: 'Student-focused accommodation with multiple rooms or beds.' },
+  { value: 'lodge', label: 'Lodge', description: 'Student or young-person accommodation, private or shared.' },
+  { value: 'bq', label: "BQ / Boys' Quarters", description: 'A smaller unit attached to or behind a main house.' },
+  { value: 'furnished-apartment', label: 'Furnished Apartment', description: 'An apartment equipped with furniture or appliances.' },
+  { value: 'short-let', label: 'Short-Let', description: 'Temporary accommodation for days, weeks, or months.' },
+] as const
+
 export const nigerianStates = ['Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue', 'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu', 'FCT', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina', 'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo', 'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara'] as const
 
 // Known major cities per state — used to infer the state of listings that only record a city.

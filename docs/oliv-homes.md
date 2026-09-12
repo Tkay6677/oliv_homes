@@ -44,6 +44,28 @@ The application is intentionally local. It is not currently a nationwide marketp
 7. Dark mode is the default. A visitor can switch to light mode with the header button.
 8. People can filter listings by named Amassoma micro-markets. The selected micro-market is shown as a radius on the map.
 
+### Recommended Amassoma house categories
+
+These are the shared categories used by the homepage, discovery page, agent workspace, API, and database:
+
+| Category | What it means |
+|---|---|
+| Single Room | One room, usually with shared toilet or kitchen facilities. |
+| Self-Contain | One room with a private toilet/bathroom and usually a small kitchenette or space. |
+| Room & Parlour Self-Contain | Bedroom, private sitting room, and private toilet/bathroom. |
+| 1 Bedroom Flat | Bedroom, living room, kitchen, and bathroom/toilet. |
+| 2 Bedroom Flat | Two bedrooms, living room, kitchen, and bathroom/toilet. |
+| 3 Bedroom Flat | Three bedrooms, living room, kitchen, and bathroom/toilet. |
+| 4+ Bedroom Flat/House | Larger family or group accommodation. |
+| Duplex | Multi-floor residential house. |
+| Bungalow | Single-floor standalone house. |
+| Shared Apartment | Multiple tenants sharing a flat or house. |
+| Hostel | Student-focused accommodation, usually with multiple rooms or beds. |
+| Lodge | Student or young-person accommodation; private or shared. |
+| BQ / Boys' Quarters | Separate smaller unit attached to or behind a main house. |
+| Furnished Apartment | Apartment already equipped with furniture or appliances. |
+| Short-Let | Temporary accommodation rented for days, weeks, or months. |
+
 ## 4. Technology used
 
 | Part | Technology | What it does |

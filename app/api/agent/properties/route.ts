@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
 import { createAgentProperty, deleteAgentProperty, listAgentProperties, updateAgentProperty } from '@/lib/oliv-db'
-import { getAmassomaZone, OLIV_MARKET } from '@/lib/oliv-data'
+import { getAmassomaZone, OLIV_MARKET, PROPERTY_CATEGORIES } from '@/lib/oliv-data'
 import type { Property } from '@/lib/types'
 
 export const runtime = 'nodejs'
 
-const PROPERTY_TYPES: Property['type'][] = ['apartment', 'house', 'studio', 'townhouse', 'shared']
+const PROPERTY_TYPES = PROPERTY_CATEGORIES.map((category) => category.value) as unknown as Property['type'][]
 const asText = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '')
 const asInt = (value: unknown) => { const n = Number(value); return Number.isFinite(n) ? Math.round(n) : NaN }
 const parseInput = (body: Record<string, unknown>) => {

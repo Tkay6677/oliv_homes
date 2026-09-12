@@ -35,7 +35,7 @@ export interface User {
 }
 
 // Property types
-export type PropertyType = 'apartment' | 'house' | 'studio' | 'townhouse' | 'shared'
+export type PropertyType = 'single-room' | 'self-contain' | 'room-and-parlour-self-contain' | 'one-bedroom-flat' | 'two-bedroom-flat' | 'three-bedroom-flat' | 'four-plus-bedroom-flat-house' | 'duplex' | 'bungalow' | 'shared-apartment' | 'hostel' | 'lodge' | 'bq' | 'furnished-apartment' | 'short-let'
 
 // Property document
 export interface Property {
