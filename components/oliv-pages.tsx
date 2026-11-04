@@ -233,10 +233,20 @@ export function ListingPage({ id = '' }: { id?: string }) {
   const [rating, setRating] = useState(5)
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
+  const [agent, setAgent] = useState<{ _id?: string; name: string; agentCompanyName?: string; agentBio?: string; agentOfficeLocation?: { address?: string; city?: string; state?: string } } | null>(null)
   const home = homes.find((item) => item._id === id)
   const notify = (text: string) => { setToast(text); setTimeout(() => setToast(''), 2600) }
   const propertyReviews = reviews.filter((item) => item.propertyId === id)
   const hasRequested = requests.some((item) => item.propertyId === id && item.type === 'VIEWING')
+  useEffect(() => {
+    let active = true
+    if (!home?.agentId) { setAgent(null); return () => { active = false } }
+    fetch(`/api/agent/${home.agentId}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => { if (active) setAgent(result?.agent ?? null) })
+      .catch(() => { if (active) setAgent(null) })
+    return () => { active = false }
+  }, [home?.agentId])
   if (!home && !loading) {
     return (
       <div className="min-h-screen bg-background"><Header />
@@ -303,6 +313,18 @@ export function ListingPage({ id = '' }: { id?: string }) {
               <span className="rounded-full bg-muted px-3 py-1.5">{PROPERTY_CATEGORIES.find((category) => category.value === home.type)?.label ?? home.type}</span>
             </div>
             <p className="mt-5 font-serif text-3xl">{formatNaira(home.price)}<small className="ml-2 text-sm font-normal text-muted-foreground">/ year</small></p>
+            {agent && (
+              <div className="mt-5 rounded-2xl border border-border bg-card p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-accent-foreground">Listed by</p>
+                <a href={`/agent/${home.agentId}`} className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5 hover:bg-muted">
+                  <span className="grid size-10 place-items-center rounded-full bg-muted"><UserCircle className="size-5 text-muted-foreground" /></span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold text-foreground">{agent.name}</span>
+                    {agent.agentCompanyName && <span className="block truncate text-xs text-muted-foreground">{agent.agentCompanyName}</span>}
+                  </span>
+                </a>
+              </div>
+            )}
             <p className="mt-5 leading-relaxed text-muted-foreground">{home.description}</p>
             {home.amenities?.length > 0 && (
               <div className="mt-6">
@@ -351,6 +373,100 @@ export function ListingPage({ id = '' }: { id?: string }) {
         </div>
       </main>
       <Toast text={toast} />
+    </div>
+  )
+}
+
+export function AgentPublicProfilePage({ id = '' }: { id?: string }) {
+  const { homes, user } = useOlivState()
+  const [agent, setAgent] = useState<{ _id?: string; name: string; email?: string; phone?: string; agentCompanyName?: string; agentBio?: string; agentOfficeLocation?: { lat?: number; lng?: number; address?: string; city?: string; state?: string }; agentVerificationStatus?: string } | null>(null)
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetch(`/api/agent/${id}`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => { if (!active) return; setAgent(result?.agent ?? null); setLoading(false) })
+      .catch(() => { if (!active) return; setAgent(null); setLoading(false) })
+    return () => { active = false }
+  }, [id])
+
+  const listings = homes.filter((home) => home.agentId === id)
+
+  if (!loading && !agent) {
+    return (
+      <div className="min-h-screen bg-background"><Header />
+        <main className="mx-auto max-w-3xl px-4 py-20 text-center">
+          <UserCircle className="mx-auto size-14 text-muted-foreground" />
+          <h1 className="mt-4 font-serif text-4xl">Agent profile not found</h1>
+          <p className="mt-3 text-sm text-muted-foreground">This agent is not currently available on OLIV Homes.</p>
+          <a href="/discover" className="mt-6 inline-flex rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">Back to discover</a>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-8">
+          {loading ? (
+            <div className="space-y-4">
+              <div className="h-8 w-56 animate-pulse rounded-lg bg-muted" />
+              <div className="h-4 w-72 animate-pulse rounded-lg bg-muted" />
+              <div className="h-24 w-full animate-pulse rounded-2xl bg-muted" />
+            </div>
+          ) : agent ? (
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-4">
+                <span className="grid size-16 place-items-center rounded-full bg-muted"><UserCircle className="size-8 text-muted-foreground" /></span>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Agent profile</p>
+                  <h1 className="mt-2 font-serif text-4xl">{agent.name}</h1>
+                  {agent.agentCompanyName && <p className="mt-2 text-base font-medium text-muted-foreground">{agent.agentCompanyName}</p>}
+                  {agent.agentVerificationStatus && <span className="mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold">{STATUS_LABEL[agent.agentVerificationStatus] ?? agent.agentVerificationStatus}</span>}
+                </div>
+              </div>
+              {user?.role === 'SUPER_ADMIN' && <a href="/admin" className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold">Admin overview</a>}
+            </div>
+          ) : null}
+        </div>
+
+        {agent && (
+          <div className="mt-8 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
+            <aside className="space-y-6">
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h2 className="font-serif text-2xl">About</h2>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">{agent.agentBio || 'This agent has not added a bio yet.'}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <h2 className="font-serif text-2xl">Contact</h2>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  {agent.email && <li>Email: {agent.email}</li>}
+                  {agent.phone && <li>Phone: {agent.phone}</li>}
+                </ul>
+              </div>
+              {agent.agentOfficeLocation && (
+                <div className="rounded-2xl border border-border bg-card p-5">
+                  <h2 className="font-serif text-2xl">Office</h2>
+                  <p className="mt-3 text-sm text-muted-foreground">{agent.agentOfficeLocation.address || agent.agentOfficeLocation.city || agent.agentOfficeLocation.state || 'Office location available.'}</p>
+                </div>
+              )}
+            </aside>
+
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="font-serif text-2xl">Listings</h2>
+                <span className="text-sm text-muted-foreground">{listings.length} home{listings.length === 1 ? '' : 's'}</span>
+              </div>
+              <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                {listings.length ? listings.map((home) => <PropertyCard key={home._id} id={home._id!} />) : <p className="col-span-full rounded-2xl border border-border bg-muted p-8 text-center text-sm text-muted-foreground">This agent has no public listings yet.</p>}
+              </div>
+            </section>
+          </div>
+        )}
+      </main>
     </div>
   )
 }

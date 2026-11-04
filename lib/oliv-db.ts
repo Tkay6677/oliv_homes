@@ -16,6 +16,11 @@ const clean = <T>(value: T): T => JSON.parse(JSON.stringify(value, (_, v) => v i
 export const publicUser = (user: Record<string, unknown> | null) => { if (!user) return null; const { password, passwordHash, ...safe } = user; return safe }
 
 export async function findUserByEmail(email: string) { const db = await dbReady(); return clean(await db.collection('users').findOne<OlivUser & { password: string }>({ email: email.toLowerCase().trim() })) }
+export async function findUserById(id: string) {
+  const db = await dbReady()
+  if (!ObjectId.isValid(id)) return null
+  return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(id) }))
+}
 export async function createUser(input: { name: string; email: string; password: string; role?: UserRole; phone?: string }) { const db = await dbReady(); const now = new Date(); const user = { name: input.name.trim(), email: input.email.toLowerCase().trim(), password: passwordDigest(input.password), role: input.role ?? 'USER', phone: input.phone, createdAt: now, updatedAt: now }; const result = await db.collection('users').insertOne(user); return clean({ ...user, _id: result.insertedId }) }
 export async function createSession(userId: string) { const db = await dbReady(); const token = `${randomUUID()}-${randomBytes(24).toString('hex')}`; await db.collection('sessions').insertOne({ token, userId, expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30), createdAt: new Date() }); return token }
 export async function getUserFromSession(token?: string) { if (!token) return null; const db = await dbReady(); const session = await db.collection('sessions').findOne<{ userId: string; expiresAt: Date }>({ token, expiresAt: { $gt: new Date() } }); if (!session) return null; return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(session.userId) })) }
