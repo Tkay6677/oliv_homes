@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
-import { publicUser, submitAgentApplication } from '@/lib/oliv-db'
+import { publicUser, submitLandlordApplication } from '@/lib/oliv-db'
 import { OLIV_MARKET } from '@/lib/oliv-data'
 
 export const runtime = 'nodejs'
@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const user = await currentUser()
     if (!user) return NextResponse.json({ user: null, canSubmit: false }, { status: 200 })
-    const status = user.agentVerificationStatus ?? 'NOT_STARTED'
+    const status = user.landlordVerificationStatus ?? 'NOT_STARTED'
     return NextResponse.json({ user: publicUser(user as unknown as Record<string, unknown>), canSubmit: status === 'NOT_STARTED' || status === 'REJECTED' })
   } catch (error) { console.error('[oliv] onboarding GET failed:', error); return NextResponse.json({ error: 'Unable to load onboarding state.' }, { status: 500 }) }
 }
@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const user = await currentUser()
-    if (!user) return NextResponse.json({ error: 'Sign in to start agent onboarding.' }, { status: 401 })
+    if (!user) return NextResponse.json({ error: 'Sign in to start landlord onboarding.' }, { status: 401 })
     const body = await request.json().catch(() => ({}))
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     const phone = typeof body.phone === 'string' ? body.phone.trim() : ''
@@ -37,12 +37,12 @@ export async function POST(request: Request) {
     if (phone.replace(/\D/g, '').length < 7) return NextResponse.json({ error: 'Enter a valid phone number.' }, { status: 400 })
     if (companyName.length < 2) return NextResponse.json({ error: 'Enter your agency or company name.' }, { status: 400 })
     if (licenseNumber.length < 3) return NextResponse.json({ error: 'Enter your license or registration number.' }, { status: 400 })
-    if (!states.length || states.some((state) => state.toLowerCase() !== OLIV_MARKET.state.toLowerCase())) return NextResponse.json({ error: `Agent applications are currently limited to ${OLIV_MARKET.city}, ${OLIV_MARKET.state}.` }, { status: 400 })
-    const updated = await submitAgentApplication(user._id!.toString(), { name, phone, agentCompanyName: companyName, agentLicenseNumber: licenseNumber, agentBio: bio, agentStatesServed: states, agentOfficeLocation: office })
+    if (!states.length || states.some((state) => state.toLowerCase() !== OLIV_MARKET.state.toLowerCase())) return NextResponse.json({ error: `Landlord applications are currently limited to ${OLIV_MARKET.city}, ${OLIV_MARKET.state}.` }, { status: 400 })
+    const updated = await submitLandlordApplication(user._id!.toString(), { name, phone, landlordCompanyName: companyName, landlordLicenseNumber: licenseNumber, landlordBio: bio, landlordStatesServed: states, landlordOfficeLocation: office })
     return NextResponse.json({ user: publicUser(updated as unknown as Record<string, unknown>), message: 'Application submitted for review.' })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to submit application.'
-    if (['Account not found.', 'This account is already a verified agent.', 'This account is suspended. Contact support.'].includes(message)) return NextResponse.json({ error: message }, { status: 409 })
+    if (['Account not found.', 'This account is already a verified landlord.', 'This account is suspended. Contact support.'].includes(message)) return NextResponse.json({ error: message }, { status: 409 })
     console.error('[oliv] onboarding POST failed:', error); return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -11,23 +11,23 @@ People looking for a home can:
 - View a property on a map.
 - Save a home for later.
 - Ask for a viewing.
-- Send an inquiry to the agent.
+- Send an inquiry to the landlord.
 - Leave a review.
 
-Agents can apply to list homes. Once an administrator verifies an agent, that agent can create, edit, and delete their own listings and reply to renter requests.
+Landlords can apply to list homes. Once an administrator verifies an landlord, that landlord can create, edit, and delete their own listings and reply to renter requests.
 
-The application is intentionally local. It is not currently a nationwide marketplace. New public listings and new agent listings must use **Amassoma** as the city.
+The application is intentionally local. It is not currently a nationwide marketplace. New public listings and new landlord listings must use **Amassoma** as the city.
 
 ## 2. Important words in simple terms
 
 | Word | Meaning |
 |---|---|
 | Renter | A normal user looking for a home. In the code, this is the `USER` role. |
-| Agent | A property professional who lists homes and handles requests. |
-| Administrator | A trusted person who reviews agents and manages the platform. |
+| Landlord | A property professional who lists homes and handles requests. |
+| Administrator | A trusted person who reviews landlords and manages the platform. |
 | Listing | One property advertisement. |
 | Viewing request | A request from a renter to visit a property. |
-| Inquiry | A message from a renter to an agent. |
+| Inquiry | A message from a renter to an landlord. |
 | Session | The secure record that keeps a signed-in user logged in. |
 | Seed data | Sample users and listings inserted for development. |
 
@@ -38,15 +38,15 @@ The application is intentionally local. It is not currently a nationwide marketp
    - Latitude: `4.9730872`
    - Longitude: `6.1089697`
 3. Public property searches only return published Amassoma listings.
-4. Agents must be verified before they can publish listings.
-5. An agent can edit or delete only their own listings.
+4. Landlords must be verified before they can publish listings.
+5. An landlord can edit or delete only their own listings.
 6. Deleting a listing also removes its saved-property records, reviews, and viewing requests.
 7. Dark mode is the default. A visitor can switch to light mode with the header button.
 8. People can filter listings by named Amassoma micro-markets. The selected micro-market is shown as a radius on the map.
 
 ### Recommended Amassoma house categories
 
-These are the shared categories used by the homepage, discovery page, agent workspace, API, and database:
+These are the shared categories used by the homepage, discovery page, landlord workspace, API, and database:
 
 | Category | What it means |
 |---|---|
@@ -125,8 +125,8 @@ app/
   login/page.tsx            Sign in
   signup/page.tsx           Create account
   profile/page.tsx          Saved homes and requests
-  agent/onboarding/page.tsx Agent application
-  agent/dashboard/page.tsx  Agent workspace
+  landlord/onboarding/page.tsx Landlord application
+  landlord/dashboard/page.tsx  Landlord workspace
   admin/page.tsx            Admin workspace
   api/                      Server API routes
 components/
@@ -155,9 +155,9 @@ docs/
 | `/login` | Signs a user into an existing account. |
 | `/signup` | Creates a normal user account. |
 | `/profile` | Shows saved homes, viewing requests, inquiries, and notifications. |
-| `/agent/onboarding` | Collects an agent application. Coverage is fixed to Amassoma. |
-| `/agent/dashboard` | Lets a verified agent manage listings and renter requests. |
-| `/admin` | Lets a super admin review agents and platform activity. |
+| `/landlord/onboarding` | Collects an landlord application. Coverage is fixed to Amassoma. |
+| `/landlord/dashboard` | Lets a verified landlord manage listings and renter requests. |
+| `/admin` | Lets a super admin review landlords and platform activity. |
 
 ### Renter journey
 
@@ -167,22 +167,22 @@ flowchart LR
 	Discover --> Details["Open a listing"]
 	Details --> Save["Save home"]
 	Details --> Request["Request viewing or send inquiry"]
-	Request --> Agent["Agent receives notification"]
-	Agent --> Reply["Agent confirms, declines, or replies"]
+	Request --> Landlord["Landlord receives notification"]
+	Landlord --> Reply["Landlord confirms, declines, or replies"]
 	Reply --> Renter["Renter sees update"]
 	Details --> Review["Leave a review"]
 ```
 
-### Agent journey
+### Landlord journey
 
 ```mermaid
 flowchart TD
-	Apply["Agent opens onboarding"] --> Form["Adds identity and agency details"]
+	Apply["Landlord opens onboarding"] --> Form["Adds identity and agency details"]
 	Form --> Coverage["Amassoma coverage and office pin"]
 	Coverage --> Submit["Submit application"]
 	Submit --> AdminReview["Administrator reviews application"]
-	AdminReview -->|Approved| Workspace["Agent workspace"]
-	AdminReview -->|Rejected| Reapply["Agent corrects details and reapplies"]
+	AdminReview -->|Approved| Workspace["Landlord workspace"]
+	AdminReview -->|Rejected| Reapply["Landlord corrects details and reapplies"]
 	Workspace --> Create["Create listing"]
 	Workspace --> Edit["Edit own listing"]
 	Workspace --> Delete["Delete own listing"]
@@ -198,23 +198,23 @@ The server checks permissions for every protected operation. A button being hidd
 | Role | Allowed actions |
 |---|---|
 | `USER` | Browse, save homes, request viewings, send inquiries, and write reviews. |
-| `AGENT` with `VERIFIED` status | Create, edit, delete owned listings and answer requests. |
-| `AGENT` not yet verified | Apply and view onboarding status, but cannot publish listings. |
-| `SUPER_ADMIN` | Review agent applications and perform platform administration. |
+| `LANDLORD` with `VERIFIED` status | Create, edit, delete owned listings and answer requests. |
+| `LANDLORD` not yet verified | Apply and view onboarding status, but cannot publish listings. |
+| `SUPER_ADMIN` | Review landlord applications and perform platform administration. |
 
-Super admins also manage the Amassoma micro-market catalog. From `/admin`, they can add an area, change its name or description, click directly on the live map to move its center point, type exact latitude and longitude values, adjust a live radius slider, type the radius in metres, or delete the area. The saved catalog is shared by public discovery, listing detail maps, agent listing forms, and the agent workspace.
+Super admins also manage the Amassoma micro-market catalog. From `/admin`, they can add an area, change its name or description, click directly on the live map to move its center point, type exact latitude and longitude values, adjust a live radius slider, type the radius in metres, or delete the area. The saved catalog is shared by public discovery, listing detail maps, landlord listing forms, and the landlord workspace.
 
-### Agent verification states
+### Landlord verification states
 
 ```mermaid
 stateDiagram-v2
 	[*] --> NOT_STARTED
-	NOT_STARTED --> SUBMITTED: Agent submits application
+	NOT_STARTED --> SUBMITTED: Landlord submits application
 	SUBMITTED --> UNDER_REVIEW: Admin starts review
 	UNDER_REVIEW --> VERIFIED: Admin approves
 	UNDER_REVIEW --> REJECTED: Admin rejects
 	VERIFIED --> SUSPENDED: Admin suspends account
-	REJECTED --> SUBMITTED: Agent reapplies
+	REJECTED --> SUBMITTED: Landlord reapplies
 	SUSPENDED --> [*]
 	VERIFIED --> [*]
 ```
@@ -247,12 +247,12 @@ erDiagram
 		string phone
 		string password_hash
 		string role
-		string agent_verification_status
-		number agent_verification_level
-		string agent_company_name
-		string agent_license_number
-		string[] agent_states_served
-		object agent_office_location
+		string landlord_verification_status
+		number landlord_verification_level
+		string landlord_company_name
+		string landlord_license_number
+		string[] landlord_states_served
+		object landlord_office_location
 		date created_at
 		date updated_at
 	}
@@ -267,7 +267,7 @@ erDiagram
 
 	PROPERTIES {
 		ObjectId _id PK
-		string agent_id FK
+		string landlord_id FK
 		string title
 		string description
 		string type
@@ -297,13 +297,13 @@ erDiagram
 		ObjectId _id PK
 		string user_id FK
 		string property_id FK
-		string agent_id FK
+		string landlord_id FK
 		string type
 		string status
 		date preferred_date
 		string preferred_time
 		string message
-		string agent_reply
+		string landlord_reply
 		date created_at
 		date updated_at
 	}
@@ -344,30 +344,30 @@ erDiagram
 
 #### `users`
 
-Stores renters, agents, and administrators. Agent-specific fields are kept on the same user document because an agent begins as a normal account and later receives verification information.
+Stores renters, landlords, and administrators. Landlord-specific fields are kept on the same user document because an landlord begins as a normal account and later receives verification information.
 
 Important fields:
 
-- `role`: `USER`, `AGENT`, or `SUPER_ADMIN`.
-- `agentVerificationStatus`: `NOT_STARTED`, `SUBMITTED`, `UNDER_REVIEW`, `VERIFIED`, `REJECTED`, or `SUSPENDED`.
-- `agentOfficeLocation`: the agent's optional map pin.
-- `agentStatesServed`: retained for the account model, but current onboarding coverage is Amassoma/Bayelsa only.
+- `role`: `USER`, `LANDLORD`, or `SUPER_ADMIN`.
+- `landlordVerificationStatus`: `NOT_STARTED`, `SUBMITTED`, `UNDER_REVIEW`, `VERIFIED`, `REJECTED`, or `SUSPENDED`.
+- `landlordOfficeLocation`: the landlord's optional map pin.
+- `landlordStatesServed`: retained for the account model, but current onboarding coverage is Amassoma/Bayelsa only.
 
 #### `properties`
 
-Stores each listing. The `agentId` connects the listing to its owner. The `location` object contains the Amassoma address and optional latitude/longitude.
+Stores each listing. The `landlordId` connects the listing to its owner. The `location` object contains the Amassoma address and optional latitude/longitude.
 
 Important fields:
 
 - `published`: controls whether the public catalog can show the listing.
 - `price`: yearly rent in the current user interface.
 - `images`: HTTPS image URLs.
-- `coordinates`: the exact map point when the agent pins one.
+- `coordinates`: the exact map point when the landlord pins one.
 - `area`: the selected Amassoma micro-market, such as `CHS Area` or `Mango Street`.
 
 ### Amassoma micro-markets
 
-The location filter uses a fixed shared catalog so that renters, agents, maps, seed data, and documentation use the same names:
+The location filter uses a fixed shared catalog so that renters, landlords, maps, seed data, and documentation use the same names:
 
 | Area | Simple description |
 |---|---|
@@ -407,46 +407,46 @@ Stores the in-app notification bell items. Notifications can link back to a list
 
 #### `auditLogs`
 
-Stores important administrative actions such as submitting or approving an agent application.
+Stores important administrative actions such as submitting or approving an landlord application.
 
 ## 10. Listing create, edit, and delete design
 
-The agent property API uses these operations:
+The landlord property API uses these operations:
 
 | Method | URL | Purpose |
 |---|---|---|
-| `GET` | `/api/agent/properties` | List the signed-in agent's properties. |
-| `POST` | `/api/agent/properties` | Create a property after validation. |
-| `PATCH` | `/api/agent/properties` | Edit a property when `propertyId` is supplied. |
-| `DELETE` | `/api/agent/properties?id=...` | Delete an owned property. |
+| `GET` | `/api/landlord/properties` | List the signed-in landlord's properties. |
+| `POST` | `/api/landlord/properties` | Create a property after validation. |
+| `PATCH` | `/api/landlord/properties` | Edit a property when `propertyId` is supplied. |
+| `DELETE` | `/api/landlord/properties?id=...` | Delete an owned property. |
 
-For edits and deletes, the database query includes both the listing ID and the signed-in user's ID. This prevents Agent A from changing Agent B's listing even if Agent A guesses the listing ID.
+For edits and deletes, the database query includes both the listing ID and the signed-in user's ID. This prevents Landlord A from changing Landlord B's listing even if Landlord A guesses the listing ID.
 
 ```mermaid
 sequenceDiagram
-	participant Agent as Agent browser
-	participant Route as Agent property API
+	participant Landlord as Landlord browser
+	participant Route as Landlord property API
 	participant Auth as Session and role check
 	participant DB as MongoDB
 
-	Agent->>Route: PATCH listing with propertyId and new fields
-	Route->>Auth: Read session and verify agent role
-	Auth-->>Route: Signed-in agent ID
+	Landlord->>Route: PATCH listing with propertyId and new fields
+	Route->>Auth: Read session and verify landlord role
+	Auth-->>Route: Signed-in landlord ID
 	Route->>Route: Validate Amassoma, price, type, size, and text
-	Route->>DB: Update where _id = propertyId AND agentId = signed-in agent
-	alt Listing belongs to agent
+	Route->>DB: Update where _id = propertyId AND landlordId = signed-in landlord
+	alt Listing belongs to landlord
 		DB-->>Route: Updated listing
-		Route-->>Agent: Success
+		Route-->>Landlord: Success
 	else Listing is missing or belongs to someone else
 		DB-->>Route: No match
-		Route-->>Agent: Listing not found
+		Route-->>Landlord: Listing not found
 	end
 
-	Agent->>Route: DELETE listing by ID
+	Landlord->>Route: DELETE listing by ID
 	Route->>Auth: Verify session and role
-	Route->>DB: Delete where _id = listing ID AND agentId = signed-in agent
+	Route->>DB: Delete where _id = listing ID AND landlordId = signed-in landlord
 	Route->>DB: Remove related saves, reviews, and requests
-	Route-->>Agent: Deletion success
+	Route-->>Landlord: Deletion success
 ```
 
 ## 11. API reference
@@ -471,17 +471,17 @@ sequenceDiagram
 | `GET` | `/api/requests` | Get the signed-in user's requests. |
 | `POST` | `/api/requests` | Create a viewing request or inquiry. |
 
-### Agent and administration
+### Landlord and administration
 
 | Method | Route | Description |
 |---|---|---|
-| `GET/POST` | `/api/agent/onboarding` | Read or submit an agent application. |
-| `GET/PATCH` | `/api/agent/profile` | Read or update an agent profile. |
-| `GET/POST/PATCH/DELETE` | `/api/agent/properties` | List, create, edit, or delete agent-owned listings. |
-| `GET` | `/api/agent/overview` | Load agent metrics and workspace data. |
-| `GET/PATCH` | `/api/agent/requests` | Read and answer renter requests. |
-| `GET` | `/api/agent/reviews` | Read reviews for the agent's listings. |
-| `GET/PATCH` | `/api/admin/verification` | Review and update agent verification. |
+| `GET/POST` | `/api/landlord/onboarding` | Read or submit an landlord application. |
+| `GET/PATCH` | `/api/landlord/profile` | Read or update an landlord profile. |
+| `GET/POST/PATCH/DELETE` | `/api/landlord/properties` | List, create, edit, or delete landlord-owned listings. |
+| `GET` | `/api/landlord/overview` | Load landlord metrics and workspace data. |
+| `GET/PATCH` | `/api/landlord/requests` | Read and answer renter requests. |
+| `GET` | `/api/landlord/reviews` | Read reviews for the landlord's listings. |
+| `GET/PATCH` | `/api/admin/verification` | Review and update landlord verification. |
 | `GET` | `/api/areas` | Read the current public Amassoma area catalog. |
 | `GET/POST/PATCH/DELETE` | `/api/admin/areas` | Read or manage areas and radius settings as a super admin. |
 
@@ -530,8 +530,8 @@ sequenceDiagram
 | Role | Email | Password | Main use |
 |---|---|---|---|
 | Renter | `user@olivhomes.ng` | `OlivUser2026!` | Browse and request viewings. |
-| Agent | `agent@olivhomes.ng` | `OlivAgent2026!` | Test the verified agent workspace. |
-| Admin | `admin@olivhomes.ng` | `OlivAdmin2026!` | Review agent applications. |
+| Landlord | `landlord@olivhomes.ng` | `OlivLandlord2026!` | Test the verified landlord workspace. |
+| Admin | `admin@olivhomes.ng` | `OlivAdmin2026!` | Review landlord applications. |
 
 These accounts are for local development only. Change the passwords before any real deployment.
 
@@ -561,13 +561,13 @@ The map can:
 - Open at Amassoma automatically.
 - Show listing pins.
 - Show one listing in detail.
-- Let an agent search for or click an office/listing location.
+- Let an landlord search for or click an office/listing location.
 - Reverse-geocode a clicked point into an address, town, and state.
 - Draw the selected micro-market as a visible radius circle.
 - Show the saved listing area radius on listing detail maps.
-- Show the chosen area radius while an agent pins a listing location.
+- Show the chosen area radius while an landlord pins a listing location.
 
-The same zone catalog powers the discovery filter, public maps, agent listing form, agent workspace labels, API validation, and seed data. This prevents a renter seeing one spelling while an agent sees another.
+The same zone catalog powers the discovery filter, public maps, landlord listing form, landlord workspace labels, API validation, and seed data. This prevents a renter seeing one spelling while an landlord sees another.
 
 ### Area administration flow
 
@@ -577,7 +577,7 @@ sequenceDiagram
 	participant Screen as Admin area panel
 	participant API as Admin area API
 	participant DB as MongoDB marketAreas
-	participant Users as Public and agent screens
+	participant Users as Public and landlord screens
 
 	Admin->>Screen: Add, edit, or delete an area
 	Screen->>API: Send area name, description, center, and radius
@@ -589,7 +589,7 @@ sequenceDiagram
 	API-->>Users: Same names and radius settings
 ```
 
-Map location is helpful but should not be treated as a legal boundary or property survey. Listing addresses and coordinates should be checked by the agent before publishing.
+Map location is helpful but should not be treated as a legal boundary or property survey. Listing addresses and coordinates should be checked by the landlord before publishing.
 
 ### Map data limitation
 
@@ -597,7 +597,7 @@ Map coverage and place-name data for Amassoma are not as complete or precise as 
 
 The area circles in OLIV are therefore **approximate discovery guides**, not official boundaries. A circle helps people search around a known micro-market, but it does not prove that a property is inside a neighbourhood or show the exact route to a building. A map pin can also be less accurate when the mapping service has limited local information.
 
-Agents should confirm the written address, nearest landmark, access road, and map pin with local knowledge before publishing. Renters should contact the agent for directions when a route, road name, or landmark is unclear. OLIV should not be used as the only source for travel directions, surveying, land ownership, emergency response, or legal property boundaries.
+Landlords should confirm the written address, nearest landmark, access road, and map pin with local knowledge before publishing. Renters should contact the landlord for directions when a route, road name, or landmark is unclear. OLIV should not be used as the only source for travel directions, surveying, land ownership, emergency response, or legal property boundaries.
 
 ## 15. Dark mode
 
@@ -620,14 +620,14 @@ Before launch:
 - Rotate the database password if it has ever been shared or committed.
 - Make sure `.env` is ignored by Git and never exposed to the browser.
 - Use HTTPS and secure cookies in production.
-- Add rate limits to login, signup, reviews, inquiries, and agent applications.
-- Add email or phone verification before approving real agents.
+- Add rate limits to login, signup, reviews, inquiries, and landlord applications.
+- Add email or phone verification before approving real landlords.
 - Add image type, image size, and upload abuse limits.
 - Back up MongoDB and test restoring a backup.
 - Add privacy, terms, contact, and reporting pages.
 - Add monitoring for failed API calls and database failures.
 - Review destructive actions such as database seeding and listing deletion.
-- Test permissions with two different agent accounts.
+- Test permissions with two different landlord accounts.
 
 ## 17. Useful checks
 
@@ -651,7 +651,7 @@ git diff --check
 
 ## 18. Future improvements
 
-- Add automated browser tests for renter, agent, and admin journeys.
+- Add automated browser tests for renter, landlord, and admin journeys.
 - Add pagination or infinite scrolling for larger listing catalogs.
 - Add server-side image optimization and moderation.
 - Add a proper audit log viewer for administrators.

@@ -29,7 +29,7 @@ const formatRelative = (value?: string | Date | null) => {
   if (days < 7) return `${days}d ago`
   return new Date(value).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })
 }
-const STATUS_LABEL: Record<string, string> = { NOT_STARTED: 'Not started', SUBMITTED: 'Submitted for review', UNDER_REVIEW: 'Under review', VERIFIED: 'Verified agent', REJECTED: 'Not approved', SUSPENDED: 'Suspended' }
+const STATUS_LABEL: Record<string, string> = { NOT_STARTED: 'Not started', SUBMITTED: 'Submitted for review', UNDER_REVIEW: 'Under review', VERIFIED: 'Verified landlord', REJECTED: 'Not approved', SUSPENDED: 'Suspended' }
 
 function NotificationBell() {
   const { user, notifications, unread, markNotificationRead, markAllNotificationsRead } = useOlivState()
@@ -46,7 +46,7 @@ function NotificationBell() {
       case 'VIEWING_REQUEST': case 'VIEWING_CONFIRMED': case 'VIEWING_DECLINED': case 'VIEWING_COMPLETED': return <CalendarDays className="size-4 text-primary" />
       case 'INQUIRY': case 'INQUIRY_REPLIED': return <MessageCircle className="size-4 text-primary" />
       case 'REVIEW_RECEIVED': return <Star className="size-4 text-accent-foreground" />
-      case 'AGENT_APPLICATION': case 'LISTING_PUBLISHED': return <Building2 className="size-4 text-primary" />
+      case 'LANDLORD_APPLICATION': case 'LISTING_PUBLISHED': return <Building2 className="size-4 text-primary" />
       case 'VERIFICATION_APPROVED': return <ShieldCheck className="size-4 text-green-600" />
       case 'VERIFICATION_REJECTED': case 'VERIFICATION_SUSPENDED': return <ShieldCheck className="size-4 text-red-500" />
       default: return <Bell className="size-4 text-muted-foreground" />
@@ -93,7 +93,7 @@ export function Header() {
   const navLinks = (
     <>
       <a href="/discover" onClick={close}>Discover</a>
-      {user?.role === 'AGENT' || user?.role === 'SUPER_ADMIN' ? <a href="/agent/dashboard" onClick={close}>Agent workspace</a> : <a href="/agent/onboarding" onClick={close}>For agents</a>}
+      {user?.role === 'LANDLORD' || user?.role === 'SUPER_ADMIN' ? <a href="/landlord/dashboard" onClick={close}>Landlord workspace</a> : <a href="/landlord/onboarding" onClick={close}>For landlords</a>}
       {user?.role === 'SUPER_ADMIN' && <a href="/admin" onClick={close}>Admin</a>}
       <a href="/profile" onClick={close}>Saved homes</a>
     </>
@@ -233,20 +233,20 @@ export function ListingPage({ id = '' }: { id?: string }) {
   const [rating, setRating] = useState(5)
   const [toast, setToast] = useState('')
   const [busy, setBusy] = useState(false)
-  const [agent, setAgent] = useState<{ _id?: string; name: string; agentCompanyName?: string; agentBio?: string; agentOfficeLocation?: { address?: string; city?: string; state?: string } } | null>(null)
+  const [landlord, setLandlord] = useState<{ _id?: string; name: string; landlordCompanyName?: string; landlordBio?: string; landlordOfficeLocation?: { address?: string; city?: string; state?: string } } | null>(null)
   const home = homes.find((item) => item._id === id)
   const notify = (text: string) => { setToast(text); setTimeout(() => setToast(''), 2600) }
   const propertyReviews = reviews.filter((item) => item.propertyId === id)
   const hasRequested = requests.some((item) => item.propertyId === id && item.type === 'VIEWING')
   useEffect(() => {
     let active = true
-    if (!home?.agentId) { setAgent(null); return () => { active = false } }
-    fetch(`/api/agent/${home.agentId}`)
+    if (!home?.landlordId) { setLandlord(null); return () => { active = false } }
+    fetch(`/api/landlord/${home.landlordId}`)
       .then((response) => response.ok ? response.json() : null)
-      .then((result) => { if (active) setAgent(result?.agent ?? null) })
-      .catch(() => { if (active) setAgent(null) })
+      .then((result) => { if (active) setLandlord(result?.landlord ?? null) })
+      .catch(() => { if (active) setLandlord(null) })
     return () => { active = false }
-  }, [home?.agentId])
+  }, [home?.landlordId])
   if (!home && !loading) {
     return (
       <div className="min-h-screen bg-background"><Header />
@@ -276,9 +276,9 @@ export function ListingPage({ id = '' }: { id?: string }) {
     try { notify(await requestViewing(id, new Date(`${viewDate}T09:00:00`).toISOString(), viewTime) ?? 'Viewing request sent'); setViewDate('') } catch (error) { notify(error instanceof Error ? error.message : 'Unable to request viewing') } finally { setBusy(false) }
   }
   const submitInquiry = async () => {
-    if (message.trim().length < 5) { notify('Write a short message for the agent'); return }
+    if (message.trim().length < 5) { notify('Write a short message for the landlord'); return }
     setBusy(true)
-    try { await sendInquiry(id, message); setMessage(''); notify('Message sent to the agent') } catch (error) { notify(error instanceof Error ? error.message : 'Unable to send message') } finally { setBusy(false) }
+    try { await sendInquiry(id, message); setMessage(''); notify('Message sent to the landlord') } catch (error) { notify(error instanceof Error ? error.message : 'Unable to send message') } finally { setBusy(false) }
   }
   const submitReview = async () => {
     if (review.trim().length < 5) { notify('Write a little more about the home'); return }
@@ -313,14 +313,14 @@ export function ListingPage({ id = '' }: { id?: string }) {
               <span className="rounded-full bg-muted px-3 py-1.5">{PROPERTY_CATEGORIES.find((category) => category.value === home.type)?.label ?? home.type}</span>
             </div>
             <p className="mt-5 font-serif text-3xl">{formatNaira(home.price)}<small className="ml-2 text-sm font-normal text-muted-foreground">/ year</small></p>
-            {agent && (
+            {landlord && (
               <div className="mt-5 rounded-2xl border border-border bg-card p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-accent-foreground">Listed by</p>
-                <a href={`/agent/${home.agentId}`} className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5 hover:bg-muted">
+                <a href={`/landlord/${home.landlordId}`} className="mt-2 flex items-center gap-3 rounded-xl border border-border bg-background px-3 py-2.5 hover:bg-muted">
                   <span className="grid size-10 place-items-center rounded-full bg-muted"><UserCircle className="size-5 text-muted-foreground" /></span>
                   <span className="min-w-0">
-                    <span className="block font-semibold text-foreground">{agent.name}</span>
-                    {agent.agentCompanyName && <span className="block truncate text-xs text-muted-foreground">{agent.agentCompanyName}</span>}
+                    <span className="block font-semibold text-foreground">{landlord.name}</span>
+                    {landlord.landlordCompanyName && <span className="block truncate text-xs text-muted-foreground">{landlord.landlordCompanyName}</span>}
                   </span>
                 </a>
               </div>
@@ -342,7 +342,7 @@ export function ListingPage({ id = '' }: { id?: string }) {
           <aside className="flex flex-col gap-5">
             <div className="rounded-2xl border border-border bg-card p-5">
               <h2 className="flex items-center gap-2 font-serif text-2xl"><CalendarDays className="size-5" />Book a viewing</h2>
-              {hasRequested ? <p className="mt-3 rounded-xl bg-muted px-4 py-3 text-sm">Your viewing request is with the agent. You will hear back within 24 hours.</p> : (
+              {hasRequested ? <p className="mt-3 rounded-xl bg-muted px-4 py-3 text-sm">Your viewing request is with the landlord. You will hear back within 24 hours.</p> : (
                 <div className="mt-3 flex flex-col gap-3">
                   <input type="date" value={viewDate} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setViewDate(event.target.value)} aria-label="Preferred viewing date" className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none focus:border-ring" />
                   <select value={viewTime} onChange={(event) => setViewTime(event.target.value)} aria-label="Preferred time of day" className="rounded-xl border border-border bg-background px-4 py-2.5 text-sm outline-none">
@@ -377,29 +377,29 @@ export function ListingPage({ id = '' }: { id?: string }) {
   )
 }
 
-export function AgentPublicProfilePage({ id = '' }: { id?: string }) {
+export function LandlordPublicProfilePage({ id = '' }: { id?: string }) {
   const { homes, user } = useOlivState()
-  const [agent, setAgent] = useState<{ _id?: string; name: string; email?: string; phone?: string; agentCompanyName?: string; agentBio?: string; agentOfficeLocation?: { lat?: number; lng?: number; address?: string; city?: string; state?: string }; agentVerificationStatus?: string } | null>(null)
+  const [landlord, setLandlord] = useState<{ _id?: string; name: string; email?: string; phone?: string; landlordCompanyName?: string; landlordBio?: string; landlordOfficeLocation?: { lat?: number; lng?: number; address?: string; city?: string; state?: string }; landlordVerificationStatus?: string } | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let active = true
     setLoading(true)
-    fetch(`/api/agent/${id}`)
+    fetch(`/api/landlord/${id}`)
       .then((response) => response.ok ? response.json() : null)
-      .then((result) => { if (!active) return; setAgent(result?.agent ?? null); setLoading(false) })
-      .catch(() => { if (!active) return; setAgent(null); setLoading(false) })
+      .then((result) => { if (!active) return; setLandlord(result?.landlord ?? null); setLoading(false) })
+      .catch(() => { if (!active) return; setLandlord(null); setLoading(false) })
     return () => { active = false }
   }, [id])
 
-  const listings = homes.filter((home) => home.agentId === id)
+  const listings = homes.filter((home) => home.landlordId === id)
 
-  if (!loading && !agent) {
+  if (!loading && !landlord) {
     return (
       <div className="min-h-screen bg-background"><Header />
         <main className="mx-auto max-w-3xl px-4 py-20 text-center">
           <UserCircle className="mx-auto size-14 text-muted-foreground" />
-          <h1 className="mt-4 font-serif text-4xl">Agent profile not found</h1>
-          <p className="mt-3 text-sm text-muted-foreground">This agent is not currently available on OLIV Homes.</p>
+          <h1 className="mt-4 font-serif text-4xl">Landlord profile not found</h1>
+          <p className="mt-3 text-sm text-muted-foreground">This landlord is not currently available on OLIV Homes.</p>
           <a href="/discover" className="mt-6 inline-flex rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground">Back to discover</a>
         </main>
       </div>
@@ -417,15 +417,15 @@ export function AgentPublicProfilePage({ id = '' }: { id?: string }) {
               <div className="h-4 w-72 animate-pulse rounded-lg bg-muted" />
               <div className="h-24 w-full animate-pulse rounded-2xl bg-muted" />
             </div>
-          ) : agent ? (
+          ) : landlord ? (
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-start gap-4">
                 <span className="grid size-16 place-items-center rounded-full bg-muted"><UserCircle className="size-8 text-muted-foreground" /></span>
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Agent profile</p>
-                  <h1 className="mt-2 font-serif text-4xl">{agent.name}</h1>
-                  {agent.agentCompanyName && <p className="mt-2 text-base font-medium text-muted-foreground">{agent.agentCompanyName}</p>}
-                  {agent.agentVerificationStatus && <span className="mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold">{STATUS_LABEL[agent.agentVerificationStatus] ?? agent.agentVerificationStatus}</span>}
+                  <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Landlord profile</p>
+                  <h1 className="mt-2 font-serif text-4xl">{landlord.name}</h1>
+                  {landlord.landlordCompanyName && <p className="mt-2 text-base font-medium text-muted-foreground">{landlord.landlordCompanyName}</p>}
+                  {landlord.landlordVerificationStatus && <span className="mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-xs font-semibold">{STATUS_LABEL[landlord.landlordVerificationStatus] ?? landlord.landlordVerificationStatus}</span>}
                 </div>
               </div>
               {user?.role === 'SUPER_ADMIN' && <a href="/admin" className="rounded-full border border-border px-5 py-2.5 text-sm font-semibold">Admin overview</a>}
@@ -433,24 +433,24 @@ export function AgentPublicProfilePage({ id = '' }: { id?: string }) {
           ) : null}
         </div>
 
-        {agent && (
+        {landlord && (
           <div className="mt-8 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
             <aside className="space-y-6">
               <div className="rounded-2xl border border-border bg-card p-5">
                 <h2 className="font-serif text-2xl">About</h2>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">{agent.agentBio || 'This agent has not added a bio yet.'}</p>
+                <p className="mt-3 text-sm leading-7 text-muted-foreground">{landlord.landlordBio || 'This landlord has not added a bio yet.'}</p>
               </div>
               <div className="rounded-2xl border border-border bg-card p-5">
                 <h2 className="font-serif text-2xl">Contact</h2>
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                  {agent.email && <li>Email: {agent.email}</li>}
-                  {agent.phone && <li>Phone: {agent.phone}</li>}
+                  {landlord.email && <li>Email: {landlord.email}</li>}
+                  {landlord.phone && <li>Phone: {landlord.phone}</li>}
                 </ul>
               </div>
-              {agent.agentOfficeLocation && (
+              {landlord.landlordOfficeLocation && (
                 <div className="rounded-2xl border border-border bg-card p-5">
                   <h2 className="font-serif text-2xl">Office</h2>
-                  <p className="mt-3 text-sm text-muted-foreground">{agent.agentOfficeLocation.address || agent.agentOfficeLocation.city || agent.agentOfficeLocation.state || 'Office location available.'}</p>
+                  <p className="mt-3 text-sm text-muted-foreground">{landlord.landlordOfficeLocation.address || landlord.landlordOfficeLocation.city || landlord.landlordOfficeLocation.state || 'Office location available.'}</p>
                 </div>
               )}
             </aside>
@@ -461,7 +461,7 @@ export function AgentPublicProfilePage({ id = '' }: { id?: string }) {
                 <span className="text-sm text-muted-foreground">{listings.length} home{listings.length === 1 ? '' : 's'}</span>
               </div>
               <div className="mt-5 grid gap-5 sm:grid-cols-2">
-                {listings.length ? listings.map((home) => <PropertyCard key={home._id} id={home._id!} />) : <p className="col-span-full rounded-2xl border border-border bg-muted p-8 text-center text-sm text-muted-foreground">This agent has no public listings yet.</p>}
+                {listings.length ? listings.map((home) => <PropertyCard key={home._id} id={home._id!} />) : <p className="col-span-full rounded-2xl border border-border bg-muted p-8 text-center text-sm text-muted-foreground">This landlord has no public listings yet.</p>}
               </div>
             </section>
           </div>
@@ -514,7 +514,7 @@ export function LoginPage({ signup = false }: { signup?: boolean }) {
           </label>
           <button type="submit" disabled={busy} className="rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">{busy ? 'Please wait…' : signup ? 'Create account' : 'Sign in'}</button>
           <p className="text-center text-sm text-muted-foreground">{signup ? 'Already have an account? ' : 'New to OLIV Homes? '}<a href={signup ? '/login' : '/signup'} className="font-semibold underline">{signup ? 'Sign in' : 'Create an account'}</a></p>
-          <p className="rounded-xl bg-muted px-4 py-3 text-center text-xs text-muted-foreground">Want to list homes? <a href="/agent/onboarding" className="font-semibold underline">Apply as an agent</a></p>
+          <p className="rounded-xl bg-muted px-4 py-3 text-center text-xs text-muted-foreground">Want to list homes? <a href="/landlord/onboarding" className="font-semibold underline">Apply as an landlord</a></p>
         </form>
       </div>
     </div>
@@ -547,7 +547,7 @@ export function ProfilePage() {
             <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
           </div>
           <div className="flex gap-2">
-            {user?.role === 'AGENT' || user?.role === 'SUPER_ADMIN' ? <a href="/agent/dashboard" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">Agent workspace</a> : <a href="/agent/onboarding" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">Become an agent</a>}
+            {user?.role === 'LANDLORD' || user?.role === 'SUPER_ADMIN' ? <a href="/landlord/dashboard" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">Landlord workspace</a> : <a href="/landlord/onboarding" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">Become an landlord</a>}
             {user?.role === 'SUPER_ADMIN' && <a href="/admin" className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Admin</a>}
           </div>
         </div>
@@ -584,7 +584,7 @@ export function ProfilePage() {
 
 const STATUS_STEPS = ['Your identity', 'Agency details', 'Coverage & location'] as const
 
-export function AgentOnboardingPage() {
+export function LandlordOnboardingPage() {
   const { refresh, areas } = useOlivState()
   const [status, setStatus] = useState<'loading' | 'guest' | 'form' | 'pending' | 'verified' | 'suspended' | 'rejected'>('loading')
   const [step, setStep] = useState(0)
@@ -600,15 +600,15 @@ export function AgentOnboardingPage() {
 
   useEffect(() => {
     let active = true
-    fetch('/api/agent/onboarding').then((response) => response.json()).then((data) => {
+    fetch('/api/landlord/onboarding').then((response) => response.json()).then((data) => {
       if (!active) return
-      const agentUser = data.user
-      if (!agentUser) { setStatus('guest'); return }
-      setName(agentUser.name ?? '')
-      if (agentUser.agentVerificationStatus === 'VERIFIED') setStatus('verified')
-      else if (agentUser.agentVerificationStatus === 'SUSPENDED') setStatus('suspended')
-      else if (agentUser.agentVerificationStatus === 'SUBMITTED' || agentUser.agentVerificationStatus === 'UNDER_REVIEW') setStatus('pending')
-      else if (agentUser.agentVerificationStatus === 'REJECTED') { setStatus('form'); setName(agentUser.name ?? '') }
+      const landlordUser = data.user
+      if (!landlordUser) { setStatus('guest'); return }
+      setName(landlordUser.name ?? '')
+      if (landlordUser.landlordVerificationStatus === 'VERIFIED') setStatus('verified')
+      else if (landlordUser.landlordVerificationStatus === 'SUSPENDED') setStatus('suspended')
+      else if (landlordUser.landlordVerificationStatus === 'SUBMITTED' || landlordUser.landlordVerificationStatus === 'UNDER_REVIEW') setStatus('pending')
+      else if (landlordUser.landlordVerificationStatus === 'REJECTED') { setStatus('form'); setName(landlordUser.name ?? '') }
       else setStatus('form')
     }).catch(() => { if (active) setStatus('guest') })
     return () => { active = false }
@@ -618,23 +618,23 @@ export function AgentOnboardingPage() {
   const submit = async () => {
     setBusy(true); setError('')
     try {
-      const response = await fetch('/api/agent/onboarding', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, phone, companyName, licenseNumber, bio, statesServed, officeLocation: office ? { lat: office.lat, lng: office.lng, address: office.address, city: office.city, state: office.state } : undefined }) })
+      const response = await fetch('/api/landlord/onboarding', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name, phone, companyName, licenseNumber, bio, statesServed, officeLocation: office ? { lat: office.lat, lng: office.lng, address: office.address, city: office.city, state: office.state } : undefined }) })
       if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error ?? 'Unable to submit application.') }
       await refresh()
       setStatus('pending')
     } catch (issue) { setError(issue instanceof Error ? issue.message : 'Unable to submit application.') } finally { setBusy(false) }
   }
 
-  if (status === 'loading') return <div className="min-h-screen bg-background"><Header /><main className="mx-auto max-w-3xl px-4 py-24 text-center text-sm text-muted-foreground">Loading your agent workspace…</main></div>
+  if (status === 'loading') return <div className="min-h-screen bg-background"><Header /><main className="mx-auto max-w-3xl px-4 py-24 text-center text-sm text-muted-foreground">Loading your landlord workspace…</main></div>
 
   if (status === 'guest') return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <ShieldCheck className="mx-auto size-14 text-accent-foreground" />
-        <h1 className="mt-4 font-serif text-4xl">Become an OLIV agent</h1>
+        <h1 className="mt-4 font-serif text-4xl">Become an OLIV landlord</h1>
         <p className="mt-3 text-sm text-muted-foreground">List verified homes in Amassoma, Bayelsa. Sign in or create an account to start your application — it takes about 3 minutes.</p>
         <div className="mt-7 flex justify-center gap-3">
-          <a href="/login?next=/agent/onboarding" className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Sign in</a>
+          <a href="/login?next=/landlord/onboarding" className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Sign in</a>
           <a href="/signup" className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold">Create account</a>
         </div>
       </main>
@@ -645,9 +645,9 @@ export function AgentOnboardingPage() {
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <Check className="mx-auto size-14 text-green-600" />
-        <h1 className="mt-4 font-serif text-4xl">You are a verified agent</h1>
+        <h1 className="mt-4 font-serif text-4xl">You are a verified landlord</h1>
         <p className="mt-3 text-sm text-muted-foreground">Your account already has listing access. Head to your workspace to manage homes and requests.</p>
-        <a href="/agent/dashboard" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Open agent workspace</a>
+        <a href="/landlord/dashboard" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Open landlord workspace</a>
       </main>
     </div>
   )
@@ -657,7 +657,7 @@ export function AgentOnboardingPage() {
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <ShieldCheck className="mx-auto size-14 text-red-500" />
         <h1 className="mt-4 font-serif text-4xl">Account suspended</h1>
-        <p className="mt-3 text-sm text-muted-foreground">This agent account is suspended. Contact support to resolve it before reapplying.</p>
+        <p className="mt-3 text-sm text-muted-foreground">This landlord account is suspended. Contact support to resolve it before reapplying.</p>
       </main>
     </div>
   )
@@ -667,7 +667,7 @@ export function AgentOnboardingPage() {
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <span className="mx-auto grid size-14 place-items-center rounded-full bg-muted"><CalendarDays className="size-7 text-muted-foreground" /></span>
         <h1 className="mt-4 font-serif text-4xl">Application received</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Our team reviews agent applications within 48 hours. You will see your verification status update here and on your profile.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Our team reviews landlord applications within 48 hours. You will see your verification status update here and on your profile.</p>
         <div className="mt-7 flex justify-center gap-3">
           <a href="/profile" className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Go to profile</a>
           <a href="/discover" className="rounded-full border border-border bg-card px-6 py-3 text-sm font-semibold">Keep exploring</a>
@@ -681,9 +681,9 @@ export function AgentOnboardingPage() {
   return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-        <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Agent onboarding</p>
+        <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Landlord onboarding</p>
         <h1 className="mt-2 font-serif text-4xl">Apply to list homes on OLIV</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Verified agents get a badge, appear in search results and manage their own listings.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Verified landlords get a badge, appear in search results and manage their own listings.</p>
         <div className="mt-8 flex items-center gap-2">
           {STATUS_STEPS.map((label, index) => (
             <div key={label} className="flex flex-1 flex-col gap-2">
@@ -725,7 +725,7 @@ export function AgentOnboardingPage() {
               <div>
                 <p className="text-sm font-medium">Market coverage</p>
                 <div className="mt-2 rounded-xl border border-primary bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">{OLIV_MARKET.city}, {OLIV_MARKET.state}</div>
-                <p className="mt-2 text-xs text-muted-foreground">OLIV currently accepts agent applications for homes within Amassoma town.</p>
+                <p className="mt-2 text-xs text-muted-foreground">OLIV currently accepts landlord applications for homes within Amassoma town.</p>
               </div>
               <div>
                 <p className="text-sm font-medium">Office location <span className="font-normal text-muted-foreground">(optional)</span></p>
@@ -749,15 +749,15 @@ export function AgentOnboardingPage() {
 
 // __NEXT_ADMIN__
 
-type AgentOverview = {
-  agent?: { name?: string; email?: string; phone?: string; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
+type LandlordOverview = {
+  landlord?: { name?: string; email?: string; phone?: string; landlordVerificationStatus?: string; landlordVerificationLevel?: number; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
   properties?: Property[]
   metrics?: { activeListings: number; draftListings: number; viewingRequests: number; inquiries: number }
   error?: string
   needsOnboarding?: boolean
 }
-type AgentRequest = { _id: string; propertyId: string; propertyTitle?: string; userId: string; userName?: string; userEmail?: string; type?: 'VIEWING' | 'INQUIRY'; status: string; preferredDate?: string; preferredTime?: string; message?: string; agentReply?: string; createdAt?: string }
-type AgentReview = { _id: string; propertyId: string; propertyTitle?: string; authorName: string; rating: number; text: string; status?: string; createdAt?: string }
+type LandlordRequest = { _id: string; propertyId: string; propertyTitle?: string; userId: string; userName?: string; userEmail?: string; type?: 'VIEWING' | 'INQUIRY'; status: string; preferredDate?: string; preferredTime?: string; message?: string; landlordReply?: string; createdAt?: string }
+type LandlordReview = { _id: string; propertyId: string; propertyTitle?: string; authorName: string; rating: number; text: string; status?: string; createdAt?: string }
 
 function AddListingForm({ property, onCreated, onCancel }: { property?: Property; onCreated: (property: Property) => void; onCancel: () => void }) {
   const { areas } = useOlivState()
@@ -808,7 +808,7 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
     if (address.trim().length < 4 || city.trim().length < 2) { notify('Enter the street address and city.'); return }
     setBusy(true)
     try {
-      const response = await fetch('/api/agent/properties', { method: property ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(property?._id ? { propertyId: property._id } : {}),
+      const response = await fetch('/api/landlord/properties', { method: property ? 'PATCH' : 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...(property?._id ? { propertyId: property._id } : {}),
         title, description, type, price: Number(price),
         location: { address, city, ...(area ? { area } : {}), ...(state ? { state } : {}), postalCode, ...(coordinates ? { coordinates: { lat: coordinates.lat, lng: coordinates.lng } } : {}) },
         bedrooms: Number(bedrooms), bathrooms: Number(bathrooms), squareMeters: Number(squareMeters),
@@ -883,14 +883,14 @@ function AddListingForm({ property, onCreated, onCancel }: { property?: Property
   )
 }
 
-function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<AgentOverview['agent']>; onSaved: (agent: Record<string, unknown>) => void; onCancel: () => void }) {
+function LandlordSettingsForm({ landlord, onSaved, onCancel }: { landlord: NonNullable<LandlordOverview['landlord']>; onSaved: (landlord: Record<string, unknown>) => void; onCancel: () => void }) {
   const { areas } = useOlivState()
-  const [companyName, setCompanyName] = useState(agent.agentCompanyName ?? '')
-  const [licenseNumber, setLicenseNumber] = useState(agent.agentLicenseNumber ?? '')
-  const [phone, setPhone] = useState(agent.phone ?? '')
-  const [bio, setBio] = useState(agent.agentBio ?? '')
-  const [statesServed, setStatesServed] = useState<string[]>(agent.agentStatesServed ?? [])
-  const [officeLocation, setOfficeLocation] = useState<PickedLocation | null>(agent.agentOfficeLocation ? { lat: agent.agentOfficeLocation.lat, lng: agent.agentOfficeLocation.lng, address: agent.agentOfficeLocation.address, city: agent.agentOfficeLocation.city, state: agent.agentOfficeLocation.state } : null)
+  const [companyName, setCompanyName] = useState(landlord.landlordCompanyName ?? '')
+  const [licenseNumber, setLicenseNumber] = useState(landlord.landlordLicenseNumber ?? '')
+  const [phone, setPhone] = useState(landlord.phone ?? '')
+  const [bio, setBio] = useState(landlord.landlordBio ?? '')
+  const [statesServed, setStatesServed] = useState<string[]>(landlord.landlordStatesServed ?? [])
+  const [officeLocation, setOfficeLocation] = useState<PickedLocation | null>(landlord.landlordOfficeLocation ? { lat: landlord.landlordOfficeLocation.lat, lng: landlord.landlordOfficeLocation.lng, address: landlord.landlordOfficeLocation.address, city: landlord.landlordOfficeLocation.city, state: landlord.landlordOfficeLocation.state } : null)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState('')
   const notify = (text: string) => { setToast(text); setTimeout(() => setToast(''), 3200) }
@@ -900,17 +900,17 @@ function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<Ag
     if (companyName.trim().length < 2) { notify('Enter your company name.'); return }
     setBusy(true)
     try {
-      const response = await fetch('/api/agent/profile', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ companyName: companyName.trim(), licenseNumber: licenseNumber.trim(), phone: phone.trim(), bio: bio.trim(), statesServed, officeLocation }) })
+      const response = await fetch('/api/landlord/profile', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ companyName: companyName.trim(), licenseNumber: licenseNumber.trim(), phone: phone.trim(), bio: bio.trim(), statesServed, officeLocation }) })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) { notify(result.error ?? 'Unable to save settings.'); return }
-      onSaved(result.agent ?? {})
+      onSaved(result.landlord ?? {})
       notify('Profile settings saved')
     } catch { notify('Unable to save settings. Check your connection.') } finally { setBusy(false) }
   }
   return (
     <div className="rounded-2xl border border-border bg-card p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2 font-serif text-2xl"><Settings className="size-5" />Agent settings</h2>
+        <h2 className="flex items-center gap-2 font-serif text-2xl"><Settings className="size-5" />Landlord settings</h2>
         <button onClick={onCancel} aria-label="Close settings" className="grid size-9 place-items-center rounded-full border border-border"><X className="size-4" /></button>
       </div>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -945,10 +945,10 @@ function AgentSettingsForm({ agent, onSaved, onCancel }: { agent: NonNullable<Ag
   )
 }
 
-export function AgentDashboardPage() {
-  const [data, setData] = useState<AgentOverview | null>(null)
-  const [requests, setRequests] = useState<AgentRequest[]>([])
-  const [reviews, setReviews] = useState<AgentReview[]>([])
+export function LandlordDashboardPage() {
+  const [data, setData] = useState<LandlordOverview | null>(null)
+  const [requests, setRequests] = useState<LandlordRequest[]>([])
+  const [reviews, setReviews] = useState<LandlordReview[]>([])
   const [tab, setTab] = useState<'listings' | 'requests' | 'reviews'>('listings')
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -962,9 +962,9 @@ export function AgentDashboardPage() {
   useEffect(() => {
     let active = true
     Promise.all([
-      fetch('/api/agent/overview').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
-      fetch('/api/agent/requests').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
-      fetch('/api/agent/reviews').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+      fetch('/api/landlord/overview').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+      fetch('/api/landlord/requests').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
+      fetch('/api/landlord/reviews').then(async (response) => ({ ok: response.ok, body: await response.json().catch(() => ({})) })),
     ]).then(([overview, requestData, reviewData]) => {
       if (!active) return
       if (!overview.ok) { setError(overview.body.needsOnboarding ? 'onboarding' : overview.body.error ?? 'Unable to load workspace.'); return }
@@ -979,11 +979,11 @@ export function AgentDashboardPage() {
     if (action === 'REPLY' && reply.length < 2) { notify('Write a reply for the renter first.'); return }
     setBusyId(requestId)
     try {
-      const response = await fetch('/api/agent/requests', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ requestId, action, reply }) })
+      const response = await fetch('/api/landlord/requests', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ requestId, action, reply }) })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) { notify(result.error ?? 'Unable to update the request.'); return }
       const statusByAction: Record<string, string> = { CONFIRM: 'CONFIRMED', COMPLETE: 'COMPLETED', CANCEL: 'CANCELLED', REPLY: 'REPLIED' }
-      setRequests((items) => items.map((item) => item._id === requestId ? { ...item, status: statusByAction[action], agentReply: action === 'REPLY' ? reply : item.agentReply } : item))
+      setRequests((items) => items.map((item) => item._id === requestId ? { ...item, status: statusByAction[action], landlordReply: action === 'REPLY' ? reply : item.landlordReply } : item))
       setReplyText((current) => { const next = { ...current }; delete next[requestId]; return next })
       notify(action === 'REPLY' ? 'Reply sent to the renter' : 'Request updated')
       setReload((value) => value + 1)
@@ -993,7 +993,7 @@ export function AgentDashboardPage() {
     if (!property._id || !window.confirm(`Delete “${property.title}”? This cannot be undone.`)) return
     setBusyId(property._id)
     try {
-      const response = await fetch(`/api/agent/properties?id=${encodeURIComponent(property._id)}`, { method: 'DELETE' })
+      const response = await fetch(`/api/landlord/properties?id=${encodeURIComponent(property._id)}`, { method: 'DELETE' })
       const result = await response.json().catch(() => ({}))
       if (!response.ok) { notify(result.error ?? 'Unable to delete the listing.'); return }
       notify('Listing deleted'); setReload((value) => value + 1)
@@ -1002,9 +1002,9 @@ export function AgentDashboardPage() {
   if (error === 'onboarding') return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-md px-4 py-24 text-center">
-        <h1 className="font-serif text-4xl">Finish agent onboarding first</h1>
-        <p className="mt-3 text-sm text-muted-foreground">Your account is not yet a verified agent. Complete the application to unlock the workspace.</p>
-        <a href="/agent/onboarding" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Start agent application</a>
+        <h1 className="font-serif text-4xl">Finish landlord onboarding first</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Your account is not yet a verified landlord. Complete the application to unlock the workspace.</p>
+        <a href="/landlord/onboarding" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Start landlord application</a>
       </main>
     </div>
   )
@@ -1012,24 +1012,24 @@ export function AgentDashboardPage() {
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-md px-4 py-24 text-center">
         <h1 className="font-serif text-4xl">Sign in to continue</h1>
-        <p className="mt-3 text-sm text-muted-foreground">The agent workspace requires an agent account.</p>
-        <a href="/login?next=/agent/dashboard" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Sign in</a>
+        <p className="mt-3 text-sm text-muted-foreground">The landlord workspace requires an landlord account.</p>
+        <a href="/login?next=/landlord/dashboard" className="mt-7 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">Sign in</a>
       </main>
     </div>
   )
   if (!data) return <div className="min-h-screen bg-background"><Header /><main className="mx-auto max-w-7xl px-4 py-24 text-center text-sm text-muted-foreground">Loading your workspace…</main></div>
   const metrics = data.metrics ?? { activeListings: 0, draftListings: 0, viewingRequests: 0, inquiries: 0 }
-  const status = data.agent?.agentVerificationStatus ?? 'NOT_STARTED'
+  const status = data.landlord?.landlordVerificationStatus ?? 'NOT_STARTED'
   return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Agent workspace</p>
-            <h1 className="mt-2 font-serif text-4xl">{data.agent?.agentCompanyName ?? data.agent?.name}</h1>
+            <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Landlord workspace</p>
+            <h1 className="mt-2 font-serif text-4xl">{data.landlord?.landlordCompanyName ?? data.landlord?.name}</h1>
             <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
               <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${status === 'VERIFIED' ? 'bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-200' : status === 'SUBMITTED' || status === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200' : 'bg-muted text-muted-foreground'}`}>{status.replace('_', ' ')}</span>
-              {data.agent?.agentStatesServed?.length ? `Serving ${data.agent.agentStatesServed.join(', ')}` : 'No states listed yet'}
+              {data.landlord?.landlordStatesServed?.length ? `Serving ${data.landlord.landlordStatesServed.join(', ')}` : 'No states listed yet'}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -1038,9 +1038,9 @@ export function AgentDashboardPage() {
             <a href="/discover" className="rounded-full border border-border bg-card px-5 py-2.5 text-sm font-semibold">View public site</a>
           </div>
         </div>
-        {settingsOpen && data.agent && (
+        {settingsOpen && data.landlord && (
           <div className="mt-6">
-            <AgentSettingsForm agent={data.agent} onSaved={(agent) => { setData((current) => current ? { ...current, agent: { ...current.agent, ...agent } } : current); setReload((value) => value + 1) }} onCancel={() => setSettingsOpen(false)} />
+            <LandlordSettingsForm landlord={data.landlord} onSaved={(landlord) => { setData((current) => current ? { ...current, landlord: { ...current.landlord, ...landlord } } : current); setReload((value) => value + 1) }} onCancel={() => setSettingsOpen(false)} />
           </div>
         )}
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1096,7 +1096,7 @@ export function AgentDashboardPage() {
                   {request.type === 'VIEWING' ? (
                     <p className="text-sm">Would like to view it on <strong>{formatDate(request.preferredDate)}</strong>{request.preferredTime ? ` (${request.preferredTime})` : ''}</p>
                   ) : <p className="text-sm">{request.message}</p>}
-                  {request.agentReply && <p className="rounded-lg bg-muted px-3 py-2 text-xs"><strong>Your reply: </strong>{request.agentReply}</p>}
+                  {request.landlordReply && <p className="rounded-lg bg-muted px-3 py-2 text-xs"><strong>Your reply: </strong>{request.landlordReply}</p>}
                   <div className="flex flex-wrap items-center gap-2">
                     {request.type === 'VIEWING' && request.status === 'PENDING' && (<>
                       <button onClick={() => void respond(request._id, 'CONFIRM')} disabled={busyId === request._id} className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60">Confirm viewing</button>
@@ -1143,12 +1143,12 @@ export function AgentDashboardPage() {
 
 // __NEXT_ADMIN_QUEUE__
 
-type QueueAgent = { _id: string; name: string; email: string; phone?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { address?: string; city?: string; state?: string }; agentVerificationStatus?: string }
+type QueueLandlord = { _id: string; name: string; email: string; phone?: string; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { address?: string; city?: string; state?: string }; landlordVerificationStatus?: string }
 type AdminArea = { name: string; description: string; center: { lat: number; lng: number }; radius: number }
 
 export function AdminDashboardPage() {
   const { user } = useOlivState()
-  const [queue, setQueue] = useState<QueueAgent[]>([])
+  const [queue, setQueue] = useState<QueueLandlord[]>([])
   const [areas, setAreas] = useState<AdminArea[]>([])
   const [areaForm, setAreaForm] = useState<AdminArea>({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 })
   const [editingArea, setEditingArea] = useState('')
@@ -1191,15 +1191,15 @@ export function AdminDashboardPage() {
     const response = await fetch('/api/admin/verification', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ userId, action }) })
     const result = await response.json().catch(() => ({}))
     if (!response.ok) { setMessage(result.error ?? 'Action failed.'); return }
-    setMessage(`${result.agent?.name ?? 'Agent'} → ${String(result.agent?.agentVerificationStatus ?? action).replace('_', ' ')}`)
-    setQueue((items) => action === 'review' ? items.map((item) => item._id === userId ? { ...item, agentVerificationStatus: 'UNDER_REVIEW' } : item) : items.filter((item) => item._id !== userId))
+    setMessage(`${result.landlord?.name ?? 'Landlord'} → ${String(result.landlord?.landlordVerificationStatus ?? action).replace('_', ' ')}`)
+    setQueue((items) => action === 'review' ? items.map((item) => item._id === userId ? { ...item, landlordVerificationStatus: 'UNDER_REVIEW' } : item) : items.filter((item) => item._id !== userId))
   }
   return (
     <div className="min-h-screen bg-background"><Header />
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <p className="text-xs font-semibold uppercase tracking-[.2em] text-accent-foreground">Super admin</p>
-        <h1 className="mt-2 font-serif text-4xl">Agent verification queue</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Review agent applications, then approve or reject. Approved agents can publish listings immediately.</p>
+        <h1 className="mt-2 font-serif text-4xl">Landlord verification queue</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Review landlord applications, then approve or reject. Approved landlords can publish listings immediately.</p>
         {message && <p role="status" className="mt-5 rounded-xl bg-muted px-4 py-3 text-sm">{message}</p>}
         {!denied && <section className="mt-7 rounded-2xl border border-border bg-card p-5 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-accent-foreground">Marketplace geography</p><h2 className="mt-1 font-serif text-2xl">Amassoma areas and radius</h2><p className="mt-1 max-w-2xl text-sm text-muted-foreground">Manage the named areas used by filters and map circles.</p></div><button type="button" onClick={() => { setEditingArea(''); setAreaForm({ name: '', description: '', center: { lat: OLIV_MARKET.center.lat, lng: OLIV_MARKET.center.lng }, radius: 400 }); setAreaEditorOpen(true) }} className="rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">Add area</button></div>
@@ -1232,28 +1232,28 @@ export function AdminDashboardPage() {
           <p className="mt-8 text-sm text-muted-foreground">Loading queue…</p>
         ) : queue.length ? (
           <div className="mt-7 flex flex-col gap-4">
-            {queue.map((agent) => (
-              <div key={agent._id} className="rounded-2xl border border-border bg-card p-5">
+            {queue.map((landlord) => (
+              <div key={landlord._id} className="rounded-2xl border border-border bg-card p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="font-serif text-xl">{agent.agentCompanyName ?? agent.name}</h2>
-                    <p className="text-sm text-muted-foreground">{agent.name} · {agent.email}{agent.phone ? ` · ${agent.phone}` : ''}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">License: {agent.agentLicenseNumber ?? '—'} · States: {agent.agentStatesServed?.join(', ') || '—'}</p>
-                    {agent.agentOfficeLocation && <p className="text-xs text-muted-foreground">Office: {[agent.agentOfficeLocation.address, agent.agentOfficeLocation.city, agent.agentOfficeLocation.state].filter(Boolean).join(', ') || 'pinned on map'}</p>}
-                    {agent.agentBio && <p className="mt-2 max-w-xl text-sm">{agent.agentBio}</p>}
+                    <h2 className="font-serif text-xl">{landlord.landlordCompanyName ?? landlord.name}</h2>
+                    <p className="text-sm text-muted-foreground">{landlord.name} · {landlord.email}{landlord.phone ? ` · ${landlord.phone}` : ''}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">License: {landlord.landlordLicenseNumber ?? '—'} · States: {landlord.landlordStatesServed?.join(', ') || '—'}</p>
+                    {landlord.landlordOfficeLocation && <p className="text-xs text-muted-foreground">Office: {[landlord.landlordOfficeLocation.address, landlord.landlordOfficeLocation.city, landlord.landlordOfficeLocation.state].filter(Boolean).join(', ') || 'pinned on map'}</p>}
+                    {landlord.landlordBio && <p className="mt-2 max-w-xl text-sm">{landlord.landlordBio}</p>}
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${agent.agentVerificationStatus === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800' : 'bg-muted text-muted-foreground'}`}>{(agent.agentVerificationStatus ?? 'SUBMITTED').replace('_', ' ')}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${landlord.landlordVerificationStatus === 'UNDER_REVIEW' ? 'bg-amber-100 text-amber-800' : 'bg-muted text-muted-foreground'}`}>{(landlord.landlordVerificationStatus ?? 'SUBMITTED').replace('_', ' ')}</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
-                  <button onClick={() => act(agent._id, 'approve')} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">Approve &amp; verify</button>
-                  <button onClick={() => act(agent._id, 'review')} className="rounded-full border border-border px-5 py-2 text-sm font-semibold">Mark under review</button>
-                  <button onClick={() => act(agent._id, 'reject')} className="rounded-full border border-border px-5 py-2 text-sm font-semibold text-red-600">Reject</button>
+                  <button onClick={() => act(landlord._id, 'approve')} className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground">Approve &amp; verify</button>
+                  <button onClick={() => act(landlord._id, 'review')} className="rounded-full border border-border px-5 py-2 text-sm font-semibold">Mark under review</button>
+                  <button onClick={() => act(landlord._id, 'reject')} className="rounded-full border border-border px-5 py-2 text-sm font-semibold text-red-600">Reject</button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-8 rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">The queue is clear — no agent applications waiting for review.</p>
+          <p className="mt-8 rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">The queue is clear — no landlord applications waiting for review.</p>
         )}
       </main>
     </div>

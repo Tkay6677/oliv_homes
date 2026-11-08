@@ -12,7 +12,7 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
   try {
     const { id } = await context.params
     if (!ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Agent not found.' }, { status: 404 })
+      return NextResponse.json({ error: 'Landlord not found.' }, { status: 404 })
     }
 
     const db = await getMongoDb()
@@ -20,27 +20,27 @@ export async function GET(_: NextRequest, context: { params: Promise<{ id: strin
       projection: { password: 0, passwordHash: 0 },
     })
 
-    if (!user || user.role !== 'AGENT') {
-      return NextResponse.json({ error: 'Agent not found.' }, { status: 404 })
+    if (!user || user.role !== 'LANDLORD') {
+      return NextResponse.json({ error: 'Landlord not found.' }, { status: 404 })
     }
 
-    const listings = await db.collection('properties').find({ agentId: id, published: true }).sort({ createdAt: -1 }).limit(12).toArray()
+    const listings = await db.collection('properties').find({ landlordId: id, published: true }).sort({ createdAt: -1 }).limit(12).toArray()
 
     return NextResponse.json({
-      agent: {
+      landlord: {
         _id: String(user._id),
         name: user.name,
         email: user.email,
         phone: user.phone ?? '',
-        agentCompanyName: user.agentCompanyName,
-        agentBio: user.agentBio,
-        agentOfficeLocation: user.agentOfficeLocation,
-        agentVerificationStatus: user.agentVerificationStatus,
+        landlordCompanyName: user.landlordCompanyName,
+        landlordBio: user.landlordBio,
+        landlordOfficeLocation: user.landlordOfficeLocation,
+        landlordVerificationStatus: user.landlordVerificationStatus,
         listings: listings.map(serializeProperty),
       },
     })
   } catch (error) {
-    console.error('[oliv] public agent profile failed:', error)
-    return NextResponse.json({ error: 'Unable to load agent profile.' }, { status: 500 })
+    console.error('[oliv] public landlord profile failed:', error)
+    return NextResponse.json({ error: 'Unable to load landlord profile.' }, { status: 500 })
   }
 }

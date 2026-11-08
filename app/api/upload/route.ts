@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const user = await currentUser()
     if (!user) return NextResponse.json({ error: 'Sign in to upload images.' }, { status: 401 })
-    if (user.role !== 'AGENT' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Agent access required.' }, { status: 403 })
+    if (user.role !== 'LANDLORD' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Landlord access required.' }, { status: 403 })
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME
     const apiKey = process.env.CLOUDINARY_API_KEY
     const apiSecret = process.env.CLOUDINARY_API_SECRET

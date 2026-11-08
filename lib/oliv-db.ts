@@ -5,8 +5,8 @@ import { ensureOlivIndexes } from './mongodb-indexes'
 import type { Property, Review } from './types'
 import { AMASSOMA_ZONES, type AmassomaZone } from './oliv-data'
 
-export type UserRole = 'USER' | 'AGENT' | 'SUPER_ADMIN'
-export type OlivUser = { _id?: string; name: string; email: string; phone?: string; role: UserRole; agentVerificationLevel?: number; agentVerificationStatus?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string }; agentSubmittedAt?: Date; agentReviewedAt?: Date; agentReviewedBy?: string; createdAt?: Date }
+export type UserRole = 'USER' | 'LANDLORD' | 'SUPER_ADMIN'
+export type OlivUser = { _id?: string; name: string; email: string; phone?: string; role: UserRole; landlordVerificationLevel?: number; landlordVerificationStatus?: string; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string }; landlordSubmittedAt?: Date; landlordReviewedAt?: Date; landlordReviewedBy?: string; createdAt?: Date }
 
 const dbReady = async () => { const db = await getMongoDb(); await ensureOlivIndexes(db); return db }
 const hashPassword = (password: string, salt: string) => createHash('sha256').update(`${salt}:${password}`).digest('hex')
@@ -31,11 +31,11 @@ export async function listReviews(propertyId: string) { const db = await dbReady
 export async function addReview(input: Omit<Review, '_id' | 'createdAt' | 'updatedAt' | 'status'>, status: Review['status'] = 'PUBLISHED') {
   const db = await dbReady(); const now = new Date(); const result = await db.collection('reviews').insertOne({ ...input, status, createdAt: now, updatedAt: now })
   const review = clean({ ...input, status, _id: result.insertedId, createdAt: now, updatedAt: now }) as unknown as Review & { _id: string }
-  // Notify the listing's agent about a new review (skip self-reviews).
+  // Notify the listing's landlord about a new review (skip self-reviews).
   try {
     const property = await getProperty(input.propertyId)
-    if (property?.agentId && String(property.agentId) !== input.userId) {
-      await createNotification({ recipientId: String(property.agentId), type: 'REVIEW_RECEIVED', title: 'New review on your listing', body: `${property.title} received a ${input.rating}-star review from ${input.authorName}.`, link: `/listing/${input.propertyId}` })
+    if (property?.landlordId && String(property.landlordId) !== input.userId) {
+      await createNotification({ recipientId: String(property.landlordId), type: 'REVIEW_RECEIVED', title: 'New review on your listing', body: `${property.title} received a ${input.rating}-star review from ${input.authorName}.`, link: `/listing/${input.propertyId}` })
     }
   } catch (error) { console.error('[oliv] review notification failed:', error) }
   return review
@@ -94,33 +94,33 @@ export async function markNotificationsRead(userId: string, ids?: string[], read
 export async function createRequest(input: Record<string, unknown>) {
   const db = await dbReady(); const result = await db.collection('viewingRequests').insertOne({ ...input, status: 'PENDING', createdAt: new Date() })
   const id = result.insertedId.toString()
-  // Notify the listing's agent about the new viewing request or inquiry.
+  // Notify the listing's landlord about the new viewing request or inquiry.
   try {
-    const agentId = String(input.agentId ?? '')
-    if (agentId) {
+    const landlordId = String(input.landlordId ?? '')
+    if (landlordId) {
       const property = await getProperty(String(input.propertyId ?? ''))
       const isInquiry = input.type === 'INQUIRY'
       await createNotification({
-        recipientId: agentId,
+        recipientId: landlordId,
         type: isInquiry ? 'INQUIRY' : 'VIEWING_REQUEST',
         title: isInquiry ? 'New inquiry on your listing' : 'New viewing request',
         body: isInquiry
           ? `${property?.title ?? 'Your listing'} — a renter sent you a message.`
           : `${property?.title ?? 'Your listing'} — a renter requested a viewing.`,
-        link: '/agent/dashboard?tab=requests',
+        link: '/landlord/dashboard?tab=requests',
       })
     }
   } catch (error) { console.error('[oliv] request notification failed:', error) }
   return id
 }
-// Agent-side request flow: update status + store the agent's reply (for inquiries), refreshed timestamps.
-export async function updateRequestStatus(requestId: string, agentId: string, patch: { status?: string; agentReply?: string }) {
+// Landlord-side request flow: update status + store the landlord's reply (for inquiries), refreshed timestamps.
+export async function updateRequestStatus(requestId: string, landlordId: string, patch: { status?: string; landlordReply?: string }) {
   const db = await dbReady()
   const update: Record<string, unknown> = { updatedAt: new Date() }
   if (patch.status) update.status = patch.status
-  if (typeof patch.agentReply === 'string') update.agentReply = patch.agentReply.slice(0, 1000)
-  const result = await db.collection('viewingRequests').updateOne({ _id: new ObjectId(requestId), agentId }, { $set: update })
-  if (!result.matchedCount) throw new Error('Request not found for this agent.')
+  if (typeof patch.landlordReply === 'string') update.landlordReply = patch.landlordReply.slice(0, 1000)
+  const result = await db.collection('viewingRequests').updateOne({ _id: new ObjectId(requestId), landlordId }, { $set: update })
+  if (!result.matchedCount) throw new Error('Request not found for this landlord.')
   const updated = clean(await db.collection('viewingRequests').findOne({ _id: new ObjectId(requestId) })) as Record<string, unknown>
   // Notify the renter about the outcome (confirmed / declined / completed / reply).
   try {
@@ -131,32 +131,32 @@ export async function updateRequestStatus(requestId: string, agentId: string, pa
       const title = property?.title ?? 'Your listing request'
       const listingLink = `/listing/${updated.propertyId}`
       const isInquiry = updated.type === 'INQUIRY'
-      if (status === 'CONFIRMED') await createNotification({ recipientId, type: 'VIEWING_CONFIRMED', title: 'Viewing confirmed', body: `Your viewing for ${title} was confirmed. The agent is expecting you.`, link: listingLink })
+      if (status === 'CONFIRMED') await createNotification({ recipientId, type: 'VIEWING_CONFIRMED', title: 'Viewing confirmed', body: `Your viewing for ${title} was confirmed. The landlord is expecting you.`, link: listingLink })
       else if (status === 'COMPLETED') await createNotification({ recipientId, type: 'VIEWING_COMPLETED', title: 'Viewing marked completed', body: `Your viewing for ${title} was marked completed.`, link: listingLink })
-      else if (status === 'CANCELLED') await createNotification({ recipientId, type: 'VIEWING_DECLINED', title: 'Viewing declined', body: `Your viewing request for ${title} was declined by the agent.`, link: listingLink })
-      else if (status === 'REPLIED' && isInquiry) await createNotification({ recipientId, type: 'INQUIRY_REPLIED', title: 'The agent replied', body: `An agent replied to your inquiry about ${title}.`, link: listingLink })
+      else if (status === 'CANCELLED') await createNotification({ recipientId, type: 'VIEWING_DECLINED', title: 'Viewing declined', body: `Your viewing request for ${title} was declined by the landlord.`, link: listingLink })
+      else if (status === 'REPLIED' && isInquiry) await createNotification({ recipientId, type: 'INQUIRY_REPLIED', title: 'The landlord replied', body: `An landlord replied to your inquiry about ${title}.`, link: listingLink })
     }
   } catch (error) { console.error('[oliv] request update notification failed:', error) }
   return updated
 }
-export async function listAgentReviews(agentId: string) {
+export async function listLandlordReviews(landlordId: string) {
   const db = await dbReady()
-  const properties = await db.collection('properties').find({ agentId }).toArray()
+  const properties = await db.collection('properties').find({ landlordId }).toArray()
   if (!properties.length) return []
   const titles = new Map(properties.map((property) => [String(property._id), String(property.title ?? 'Listing')]))
   const reviews = await db.collection('reviews').find({ propertyId: { $in: [...titles.keys()] }, status: { $ne: 'HIDDEN' } }).sort({ createdAt: -1 }).limit(100).toArray()
   return clean(reviews.map((review) => ({ ...review, propertyTitle: titles.get(review.propertyId) ?? 'Listing' })))
 }
-// Editable agent profile fields (reused by the dashboard settings).
-export async function updateAgentProfile(userId: string, patch: { phone?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }) {
+// Editable landlord profile fields (reused by the dashboard settings).
+export async function updateLandlordProfile(userId: string, patch: { phone?: string; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }) {
   const db = await dbReady()
   const update: Record<string, unknown> = { updatedAt: new Date() }
   if (typeof patch.phone === 'string') update.phone = patch.phone.trim().slice(0, 40)
-  if (typeof patch.agentCompanyName === 'string') update.agentCompanyName = patch.agentCompanyName.trim().slice(0, 80)
-  if (typeof patch.agentLicenseNumber === 'string') update.agentLicenseNumber = patch.agentLicenseNumber.trim().slice(0, 60)
-  if (typeof patch.agentBio === 'string') update.agentBio = patch.agentBio.trim().slice(0, 1200)
-  if (Array.isArray(patch.agentStatesServed)) update.agentStatesServed = patch.agentStatesServed.map((item) => String(item).slice(0, 40)).filter(Boolean).slice(0, 20)
-  if (patch.agentOfficeLocation && Number.isFinite(patch.agentOfficeLocation.lat) && Number.isFinite(patch.agentOfficeLocation.lng)) update.agentOfficeLocation = { lat: patch.agentOfficeLocation.lat, lng: patch.agentOfficeLocation.lng, address: (patch.agentOfficeLocation.address ?? '').slice(0, 200), city: (patch.agentOfficeLocation.city ?? '').slice(0, 60), state: (patch.agentOfficeLocation.state ?? '').slice(0, 60) }
+  if (typeof patch.landlordCompanyName === 'string') update.landlordCompanyName = patch.landlordCompanyName.trim().slice(0, 80)
+  if (typeof patch.landlordLicenseNumber === 'string') update.landlordLicenseNumber = patch.landlordLicenseNumber.trim().slice(0, 60)
+  if (typeof patch.landlordBio === 'string') update.landlordBio = patch.landlordBio.trim().slice(0, 1200)
+  if (Array.isArray(patch.landlordStatesServed)) update.landlordStatesServed = patch.landlordStatesServed.map((item) => String(item).slice(0, 40)).filter(Boolean).slice(0, 20)
+  if (patch.landlordOfficeLocation && Number.isFinite(patch.landlordOfficeLocation.lat) && Number.isFinite(patch.landlordOfficeLocation.lng)) update.landlordOfficeLocation = { lat: patch.landlordOfficeLocation.lat, lng: patch.landlordOfficeLocation.lng, address: (patch.landlordOfficeLocation.address ?? '').slice(0, 200), city: (patch.landlordOfficeLocation.city ?? '').slice(0, 60), state: (patch.landlordOfficeLocation.state ?? '').slice(0, 60) }
   await db.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: update })
   return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) }))
 }
@@ -183,70 +183,70 @@ export async function deleteAmassomaZone(name: string) {
   if (!result.deletedCount) throw new Error('Area not found.')
 }
 
-// Agent onboarding and verification
+// Landlord onboarding and verification
 export async function updateUser(userId: string, patch: Record<string, unknown>) { const db = await dbReady(); await db.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: { ...patch, updatedAt: new Date() } }); return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) })) }
 
-export async function submitAgentApplication(userId: string, application: { name?: string; phone?: string; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }) {
+export async function submitLandlordApplication(userId: string, application: { name?: string; phone?: string; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }) {
   const db = await dbReady(); const now = new Date()
   const user = await db.collection('users').findOne<OlivUser & { password?: string }>({ _id: new ObjectId(userId) })
   if (!user) throw new Error('Account not found.')
-  if (user.agentVerificationStatus === 'VERIFIED') throw new Error('This account is already a verified agent.')
-  if (user.agentVerificationStatus === 'SUSPENDED') throw new Error('This account is suspended. Contact support.')
-  const patch = { ...application, role: 'AGENT' as UserRole, agentVerificationStatus: 'SUBMITTED', agentSubmittedAt: now, updatedAt: now }
+  if (user.landlordVerificationStatus === 'VERIFIED') throw new Error('This account is already a verified landlord.')
+  if (user.landlordVerificationStatus === 'SUSPENDED') throw new Error('This account is suspended. Contact support.')
+  const patch = { ...application, role: 'LANDLORD' as UserRole, landlordVerificationStatus: 'SUBMITTED', landlordSubmittedAt: now, updatedAt: now }
   if (application.name) patch.name = application.name
   await db.collection('users').updateOne({ _id: new ObjectId(userId) }, { $set: patch })
-  await db.collection('auditLogs').insertOne({ actorId: userId, action: 'AGENT_APPLICATION_SUBMITTED', targetId: userId, createdAt: now })
-  await notifyAdmins('AGENT_APPLICATION', 'New agent application', `${application.name ?? user.name} (${user.email}) submitted an application for review.`, '/admin')
+  await db.collection('auditLogs').insertOne({ actorId: userId, action: 'LANDLORD_APPLICATION_SUBMITTED', targetId: userId, createdAt: now })
+  await notifyAdmins('LANDLORD_APPLICATION', 'New landlord application', `${application.name ?? user.name} (${user.email}) submitted an application for review.`, '/admin')
   return clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) }))
 }
 
-export async function listAgentsForReview() { const db = await dbReady(); return clean(await db.collection('users').find({ role: 'AGENT', agentVerificationStatus: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }, { projection: { password: 0 } }).sort({ agentSubmittedAt: 1 }).limit(50).toArray()) }
+export async function listLandlordsForReview() { const db = await dbReady(); return clean(await db.collection('users').find({ role: 'LANDLORD', landlordVerificationStatus: { $in: ['SUBMITTED', 'UNDER_REVIEW'] } }, { projection: { password: 0 } }).sort({ landlordSubmittedAt: 1 }).limit(50).toArray()) }
 
-export async function setAgentVerification(userId: string, status: 'VERIFIED' | 'REJECTED' | 'UNDER_REVIEW' | 'SUSPENDED', level: number, reviewerId: string) {
+export async function setLandlordVerification(userId: string, status: 'VERIFIED' | 'REJECTED' | 'UNDER_REVIEW' | 'SUSPENDED', level: number, reviewerId: string) {
   const db = await dbReady(); const now = new Date()
-  const result = await db.collection('users').updateOne({ _id: new ObjectId(userId), role: 'AGENT' }, { $set: { agentVerificationStatus: status, agentVerificationLevel: level, agentReviewedAt: now, agentReviewedBy: reviewerId, updatedAt: now } })
-  if (!result.matchedCount) throw new Error('Agent not found.')
-  await db.collection('auditLogs').insertOne({ actorId: reviewerId, action: `AGENT_${status}`, targetId: userId, createdAt: now })
-  // Notify the agent about the verification outcome.
-  const agent = clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) }))
+  const result = await db.collection('users').updateOne({ _id: new ObjectId(userId), role: 'LANDLORD' }, { $set: { landlordVerificationStatus: status, landlordVerificationLevel: level, landlordReviewedAt: now, landlordReviewedBy: reviewerId, updatedAt: now } })
+  if (!result.matchedCount) throw new Error('Landlord not found.')
+  await db.collection('auditLogs').insertOne({ actorId: reviewerId, action: `LANDLORD_${status}`, targetId: userId, createdAt: now })
+  // Notify the landlord about the verification outcome.
+  const landlord = clean(await db.collection('users').findOne<OlivUser>({ _id: new ObjectId(userId) }))
   const label = { VERIFIED: 'approved', REJECTED: 'not approved', SUSPENDED: 'suspended', UNDER_REVIEW: 'moved to review' }[status] ?? status
   const typeByStatus: Record<string, string> = { VERIFIED: 'VERIFICATION_APPROVED', REJECTED: 'VERIFICATION_REJECTED', SUSPENDED: 'VERIFICATION_SUSPENDED', UNDER_REVIEW: 'VERIFICATION_UNDER_REVIEW' }
-  await createNotification({ recipientId: userId, type: typeByStatus[status] ?? 'SYSTEM', title: 'Agent application update', body: `Your agent application was ${label}.`, link: '/agent/onboarding' })
-  return agent
+  await createNotification({ recipientId: userId, type: typeByStatus[status] ?? 'SYSTEM', title: 'Landlord application update', body: `Your landlord application was ${label}.`, link: '/landlord/onboarding' })
+  return landlord
 }
 
-// Agent workspace data
-export async function listAgentProperties(agentId: string) { const db = await dbReady(); return clean(await db.collection('properties').find({ agentId }).sort({ createdAt: -1 }).limit(50).toArray()) as unknown as Property[] }
-export async function agentRequestsSummary(agentId: string) { const db = await dbReady(); const [viewing, inquiries] = await Promise.all([db.collection('viewingRequests').countDocuments({ agentId, type: 'VIEWING' }), db.collection('viewingRequests').countDocuments({ agentId, type: 'INQUIRY' })]); return { viewing, inquiries } }
-export async function createAgentProperty(agentId: string, input: {
+// Landlord workspace data
+export async function listLandlordProperties(landlordId: string) { const db = await dbReady(); return clean(await db.collection('properties').find({ landlordId }).sort({ createdAt: -1 }).limit(50).toArray()) as unknown as Property[] }
+export async function landlordRequestsSummary(landlordId: string) { const db = await dbReady(); const [viewing, inquiries] = await Promise.all([db.collection('viewingRequests').countDocuments({ landlordId, type: 'VIEWING' }), db.collection('viewingRequests').countDocuments({ landlordId, type: 'INQUIRY' })]); return { viewing, inquiries } }
+export async function createLandlordProperty(landlordId: string, input: {
   title: string; description: string; type: Property['type']; price: number
   location: Property['location']; bedrooms: number; bathrooms: number; squareMeters: number
   furnished: boolean; amenities: string[]; images: string[]; published: boolean
 }) {
   const db = await dbReady(); const now = new Date()
-  const document = { ...input, agentId, currency: 'NGN', verificationBadge: false, createdAt: now, updatedAt: now }
+  const document = { ...input, landlordId, currency: 'NGN', verificationBadge: false, createdAt: now, updatedAt: now }
   const result = await db.collection('properties').insertOne(document)
   const property = clean({ ...document, _id: result.insertedId }) as unknown as Property & { _id: string }
   if (input.published) {
-    await notifyAdmins('LISTING_PUBLISHED', 'New listing published', `${property.title} was published by an agent.`, `/listing/${result.insertedId}`)
+    await notifyAdmins('LISTING_PUBLISHED', 'New listing published', `${property.title} was published by an landlord.`, `/listing/${result.insertedId}`)
   }
   return property
 }
-export async function updateAgentProperty(agentId: string, propertyId: string, input: {
+export async function updateLandlordProperty(landlordId: string, propertyId: string, input: {
   title: string; description: string; type: Property['type']; price: number
   location: Property['location']; bedrooms: number; bathrooms: number; squareMeters: number
   furnished: boolean; amenities: string[]; images: string[]; published: boolean
 }) {
   if (!ObjectId.isValid(propertyId)) throw new Error('Listing not found.')
   const db = await dbReady(); const now = new Date()
-  const result = await db.collection('properties').findOneAndUpdate({ _id: new ObjectId(propertyId), agentId }, { $set: { ...input, updatedAt: now } }, { returnDocument: 'after' })
+  const result = await db.collection('properties').findOneAndUpdate({ _id: new ObjectId(propertyId), landlordId }, { $set: { ...input, updatedAt: now } }, { returnDocument: 'after' })
   if (!result) throw new Error('Listing not found.')
   return clean(result) as unknown as Property
 }
-export async function deleteAgentProperty(agentId: string, propertyId: string) {
+export async function deleteLandlordProperty(landlordId: string, propertyId: string) {
   if (!ObjectId.isValid(propertyId)) throw new Error('Listing not found.')
   const db = await dbReady(); const _id = new ObjectId(propertyId)
-  const result = await db.collection('properties').deleteOne({ _id, agentId })
+  const result = await db.collection('properties').deleteOne({ _id, landlordId })
   if (!result.deletedCount) throw new Error('Listing not found.')
   await Promise.all([
     db.collection('savedProperties').deleteMany({ propertyId }),
@@ -258,9 +258,9 @@ export async function deleteAgentProperty(agentId: string, propertyId: string) {
 // Favorites and viewing requests
 export async function listFavoritesWithHomes(userId: string) { const db = await dbReady(); const favorites = await db.collection('savedProperties').find({ userId }).sort({ createdAt: -1 }).toArray(); const ids = favorites.map((favorite) => { try { return new ObjectId(favorite.propertyId) } catch { return null } }).filter((id): id is ObjectId => id !== null); if (!ids.length) return []; const properties = await db.collection('properties').find({ _id: { $in: ids } }).toArray(); return clean(properties) }
 export async function listRequestsForUser(userId: string) { const db = await dbReady(); return clean(await db.collection('viewingRequests').find({ userId }).sort({ createdAt: -1 }).limit(50).toArray()) }
-export async function listRequestsForAgent(agentId: string) {
+export async function listRequestsForLandlord(landlordId: string) {
   const db = await dbReady()
-  const requests = await db.collection('viewingRequests').find({ agentId }).sort({ createdAt: -1 }).limit(50).toArray()
+  const requests = await db.collection('viewingRequests').find({ landlordId }).sort({ createdAt: -1 }).limit(50).toArray()
   const propertyIds = requests.map((request) => (ObjectId.isValid(request.propertyId) ? new ObjectId(request.propertyId) : null)).filter((id): id is ObjectId => id !== null)
   const userIds = requests.map((request) => (ObjectId.isValid(request.userId) ? new ObjectId(request.userId) : null)).filter((id): id is ObjectId => id !== null)
   const titles = new Map<string, string>()

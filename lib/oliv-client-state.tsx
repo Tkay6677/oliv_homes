@@ -5,8 +5,8 @@ import type { Property } from './types'
 import { AMASSOMA_ZONES, OLIV_MARKET, type AmassomaZone, olivHomes as seededHomes } from './oliv-data'
 
 type Review = { _id?: string; id?: string; propertyId: string; author?: string; authorName?: string; rating: number; text: string; status?: string; createdAt?: string }
-type User = { _id?: string; name: string; email: string; role: 'USER' | 'AGENT' | 'SUPER_ADMIN'; agentVerificationStatus?: string; agentVerificationLevel?: number; agentCompanyName?: string; agentLicenseNumber?: string; agentBio?: string; agentStatesServed?: string[]; agentOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
-type ViewingRequest = { _id?: string; id?: string; propertyId: string; type: 'VIEWING' | 'INQUIRY'; status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REPLIED' | 'ARCHIVED'; preferredDate?: string; preferredTime?: string; message?: string; agentReply?: string; propertyTitle?: string; createdAt?: string }
+type User = { _id?: string; name: string; email: string; role: 'USER' | 'LANDLORD' | 'SUPER_ADMIN'; landlordVerificationStatus?: string; landlordVerificationLevel?: number; landlordCompanyName?: string; landlordLicenseNumber?: string; landlordBio?: string; landlordStatesServed?: string[]; landlordOfficeLocation?: { lat: number; lng: number; address?: string; city?: string; state?: string } }
+type ViewingRequest = { _id?: string; id?: string; propertyId: string; type: 'VIEWING' | 'INQUIRY'; status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REPLIED' | 'ARCHIVED'; preferredDate?: string; preferredTime?: string; message?: string; landlordReply?: string; propertyTitle?: string; createdAt?: string }
 type NotificationItem = { _id?: string; type?: string; title: string; body?: string; link?: string; readAt?: string | null; createdAt?: string }
 type State = {
   saved: string[]

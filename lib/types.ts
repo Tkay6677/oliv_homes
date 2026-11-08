@@ -1,7 +1,7 @@
 // User roles
-export type UserRole = 'SUPER_ADMIN' | 'USER' | 'AGENT'
+export type UserRole = 'SUPER_ADMIN' | 'USER' | 'LANDLORD'
 
-// Agent verification
+// Landlord verification
 export type VerificationStatus = 'NOT_STARTED' | 'SUBMITTED' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED'
 export type VerificationLevel = 0 | 1 | 2 | 3
 
@@ -16,22 +16,22 @@ export interface User {
   profileImage?: string
   createdAt?: Date
   updatedAt?: Date
-  // Agent-specific fields
-  agentVerificationStatus?: VerificationStatus
-  agentVerificationLevel?: VerificationLevel
-  agentCompanyName?: string
-  agentLicenseNumber?: string
-  agentBio?: string
-  agentStatesServed?: string[]
-  agentOfficeLocation?: {
+  // Landlord-specific fields
+  landlordVerificationStatus?: VerificationStatus
+  landlordVerificationLevel?: VerificationLevel
+  landlordCompanyName?: string
+  landlordLicenseNumber?: string
+  landlordBio?: string
+  landlordStatesServed?: string[]
+  landlordOfficeLocation?: {
     lat: number
     lng: number
     address?: string
     city?: string
     state?: string
   }
-  agentSubmittedAt?: Date | string
-  agentReviewedAt?: Date | string
+  landlordSubmittedAt?: Date | string
+  landlordReviewedAt?: Date | string
 }
 
 // Property types
@@ -40,7 +40,7 @@ export type PropertyType = 'single-room' | 'self-contain' | 'room-and-parlour-se
 // Property document
 export interface Property {
   _id?: string
-  agentId: string
+  landlordId: string
   title: string
   description: string
   type: PropertyType
@@ -83,9 +83,9 @@ export interface Inquiry {
   _id?: string
   userId: string
   propertyId: string
-  agentId: string
+  landlordId: string
   message: string
-  agentReply?: string
+  landlordReply?: string
   status: 'PENDING' | 'REPLIED' | 'ARCHIVED'
   createdAt?: Date
   updatedAt?: Date
@@ -96,12 +96,12 @@ export interface ViewingRequest {
   _id?: string
   userId: string
   propertyId: string
-  agentId: string
+  landlordId: string
   type?: 'VIEWING' | 'INQUIRY'
   preferredDate?: Date | string
   preferredTime?: string
   message?: string
-  agentReply?: string
+  landlordReply?: string
   status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'CANCELLED' | 'REPLIED' | 'ARCHIVED'
   notes?: string
   createdAt?: Date
@@ -139,7 +139,7 @@ export type NotificationType =
   | 'VIEWING_COMPLETED'
   | 'INQUIRY_REPLIED'
   | 'REVIEW_RECEIVED'
-  | 'AGENT_APPLICATION'
+  | 'LANDLORD_APPLICATION'
   | 'VERIFICATION_UNDER_REVIEW'
   | 'VERIFICATION_APPROVED'
   | 'VERIFICATION_REJECTED'

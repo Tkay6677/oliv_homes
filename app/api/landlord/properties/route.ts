@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { currentUser } from '@/lib/oliv-auth'
-import { createAgentProperty, deleteAgentProperty, listAgentProperties, updateAgentProperty } from '@/lib/oliv-db'
+import { createLandlordProperty, deleteLandlordProperty, listLandlordProperties, updateLandlordProperty } from '@/lib/oliv-db'
 import { getAmassomaZone, OLIV_MARKET, PROPERTY_CATEGORIES } from '@/lib/oliv-data'
 import type { Property } from '@/lib/types'
 
@@ -45,47 +45,47 @@ export async function GET() {
   try {
     const user = await currentUser()
     if (!user) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 })
-    if (user.role !== 'AGENT' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Agent access required.' }, { status: 403 })
-    return NextResponse.json({ properties: await listAgentProperties(user._id!.toString()) })
-  } catch (error) { console.error('[oliv] agent properties list failed:', error); return NextResponse.json({ error: 'Unable to load listings.' }, { status: 500 }) }
+    if (user.role !== 'LANDLORD' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Landlord access required.' }, { status: 403 })
+    return NextResponse.json({ properties: await listLandlordProperties(user._id!.toString()) })
+  } catch (error) { console.error('[oliv] landlord properties list failed:', error); return NextResponse.json({ error: 'Unable to load listings.' }, { status: 500 }) }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const user = await currentUser()
     if (!user) return NextResponse.json({ error: 'Sign in to create a listing.' }, { status: 401 })
-    if (user.role !== 'AGENT' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Agent access required.', needsOnboarding: true }, { status: 403 })
-    if (user.role === 'AGENT' && user.agentVerificationStatus !== 'VERIFIED') return NextResponse.json({ error: 'Only verified agents can publish listings. Finish verification first.' }, { status: 403 })
+    if (user.role !== 'LANDLORD' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Landlord access required.', needsOnboarding: true }, { status: 403 })
+    if (user.role === 'LANDLORD' && user.landlordVerificationStatus !== 'VERIFIED') return NextResponse.json({ error: 'Only verified landlords can publish listings. Finish verification first.' }, { status: 403 })
     const body = await request.json().catch(() => null)
     if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
 
     if (invalidArea(body as Record<string, unknown>)) return NextResponse.json({ error: 'Choose a valid Amassoma area.' }, { status: 400 })
     const input = parseInput(body as Record<string, unknown>); const validationError = validateInput(input)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
-    const property = await createAgentProperty(user._id!.toString(), { ...input, type: input.type! })
+    const property = await createLandlordProperty(user._id!.toString(), { ...input, type: input.type! })
     return NextResponse.json({ property }, { status: 201 })
-  } catch (error) { console.error('[oliv] agent property create failed:', error); return NextResponse.json({ error: 'Unable to create the listing.' }, { status: 500 }) }
+  } catch (error) { console.error('[oliv] landlord property create failed:', error); return NextResponse.json({ error: 'Unable to create the listing.' }, { status: 500 }) }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
     const user = await currentUser(); if (!user) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 })
-    if (user.role !== 'AGENT' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Agent access required.' }, { status: 403 })
+    if (user.role !== 'LANDLORD' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Landlord access required.' }, { status: 403 })
     const body = await request.json().catch(() => null) as Record<string, unknown> | null
     const propertyId = typeof body?.propertyId === 'string' ? body.propertyId : ''
     if (!body || !propertyId) return NextResponse.json({ error: 'Listing id is required.' }, { status: 400 })
     if (invalidArea(body)) return NextResponse.json({ error: 'Choose a valid Amassoma area.' }, { status: 400 })
     const input = parseInput(body); const validationError = validateInput(input)
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 })
-    return NextResponse.json({ property: await updateAgentProperty(user._id!.toString(), propertyId, { ...input, type: input.type! }) })
+    return NextResponse.json({ property: await updateLandlordProperty(user._id!.toString(), propertyId, { ...input, type: input.type! }) })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to update the listing.' }, { status: 400 }) }
 }
 
 export async function DELETE(request: NextRequest) {
   try {
     const user = await currentUser(); if (!user) return NextResponse.json({ error: 'Sign in required.' }, { status: 401 })
-    if (user.role !== 'AGENT' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Agent access required.' }, { status: 403 })
-    const propertyId = request.nextUrl.searchParams.get('id') ?? ''; await deleteAgentProperty(user._id!.toString(), propertyId)
+    if (user.role !== 'LANDLORD' && user.role !== 'SUPER_ADMIN') return NextResponse.json({ error: 'Landlord access required.' }, { status: 403 })
+    const propertyId = request.nextUrl.searchParams.get('id') ?? ''; await deleteLandlordProperty(user._id!.toString(), propertyId)
     return NextResponse.json({ ok: true })
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to delete the listing.' }, { status: 400 }) }
 }

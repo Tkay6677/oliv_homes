@@ -1,4 +1,4 @@
-// End-to-end test: agent onboarding + admin verification + agent overview
+// End-to-end test: landlord onboarding + admin verification + landlord overview
 // Usage: node scripts/e2e-onboarding.mjs [baseUrl]
 import { MongoClient } from 'mongodb'
 import { createHash, randomBytes } from 'node:crypto'
@@ -25,27 +25,27 @@ const call = async (path, { method = 'GET', body, cookieKey = 'default' } = {}) 
 
 const main = async () => {
   console.log(`E2E against ${base}`)
-  const email = `e2e-agent-${stamp}@olivtest.ng`
-  const signup = await call('/api/auth', { method: 'POST', body: { action: 'signup', name: 'Test Agent', email, password: 'TestAgent2026!' } })
-  check('signup creates agent account', signup.status === 200, `status ${signup.status} ${JSON.stringify(signup.json).slice(0, 120)}`)
+  const email = `e2e-landlord-${stamp}@olivtest.ng`
+  const signup = await call('/api/auth', { method: 'POST', body: { action: 'signup', name: 'Test Landlord', email, password: 'TestLandlord2026!' } })
+  check('signup creates landlord account', signup.status === 200, `status ${signup.status} ${JSON.stringify(signup.json).slice(0, 120)}`)
 
-  const before = await call('/api/agent/onboarding')
+  const before = await call('/api/landlord/onboarding')
   check('GET onboarding offers submission', before.status === 200 && before.json.canSubmit === true, `status ${before.status} canSubmit=${before.json.canSubmit}`)
   check('GET onboarding never leaks password', Boolean(before.json.user) && !JSON.stringify(before.json.user).includes('"password"'))
 
-  const missing = await call('/api/agent/onboarding', { method: 'POST', body: { name: 'T', phone: '123' } })
+  const missing = await call('/api/landlord/onboarding', { method: 'POST', body: { name: 'T', phone: '123' } })
   check('onboarding rejects incomplete payload', missing.status === 400, `status ${missing.status} error=${missing.json.error}`)
 
-  const submit = await call('/api/agent/onboarding', {
+  const submit = await call('/api/landlord/onboarding', {
     method: 'POST',
-    body: { name: 'Chidi Test', phone: '+234 803 555 0100', companyName: 'Test Homes Ltd', licenseNumber: 'BAY-E2E-001', bio: 'E2E verification agent.', statesServed: ['Bayelsa', 'Rivers'], officeLocation: { lat: 4.9267, lng: 6.2676, address: '201 Sani Abacha Way', city: 'Yenagoa', state: 'Bayelsa' } },
+    body: { name: 'Chidi Test', phone: '+234 803 555 0100', companyName: 'Test Homes Ltd', licenseNumber: 'BAY-E2E-001', bio: 'E2E verification landlord.', statesServed: ['Bayelsa', 'Rivers'], officeLocation: { lat: 4.9267, lng: 6.2676, address: '201 Sani Abacha Way', city: 'Yenagoa', state: 'Bayelsa' } },
   })
   check('onboarding accepts valid application', submit.status === 200, `status ${submit.status} ${JSON.stringify(submit.json).slice(0, 160)}`)
-  check('application lands in SUBMITTED', submit.json.user?.agentVerificationStatus === 'SUBMITTED', `status=${submit.json.user?.agentVerificationStatus}`)
-  check('office location persisted', submit.json.user?.agentOfficeLocation?.city === 'Yenagoa' && Number(submit.json.user?.agentOfficeLocation?.lat) === 4.9267, JSON.stringify(submit.json.user?.agentOfficeLocation))
+  check('application lands in SUBMITTED', submit.json.user?.landlordVerificationStatus === 'SUBMITTED', `status=${submit.json.user?.landlordVerificationStatus}`)
+  check('office location persisted', submit.json.user?.landlordOfficeLocation?.city === 'Yenagoa' && Number(submit.json.user?.landlordOfficeLocation?.lat) === 4.9267, JSON.stringify(submit.json.user?.landlordOfficeLocation))
 
-  const after = await call('/api/agent/onboarding')
-  check('GET onboarding locks after submit', after.json.canSubmit === false && after.json.user?.agentVerificationStatus === 'SUBMITTED', `canSubmit=${after.json.canSubmit}`)
+  const after = await call('/api/landlord/onboarding')
+  check('GET onboarding locks after submit', after.json.canSubmit === false && after.json.user?.landlordVerificationStatus === 'SUBMITTED', `canSubmit=${after.json.canSubmit}`)
 
   const forbidden = await call('/api/admin/verification')
   check('non-admin blocked from verification queue', forbidden.status === 403, `status ${forbidden.status}`)
@@ -66,28 +66,28 @@ const main = async () => {
   check('admin can sign in', adminLogin.status === 200, `status ${adminLogin.status}`)
 
   const queue = await call('/api/admin/verification', { cookieKey: 'admin' })
-  const queued = (queue.json.queue ?? []).find((agent) => agent.email === email)
+  const queued = (queue.json.queue ?? []).find((landlord) => landlord.email === email)
   check('queue contains the application', queue.status === 200 && Boolean(queued), `status ${queue.status} count=${(queue.json.queue ?? []).length}`)
   check('queue never leaks password hashes', !JSON.stringify(queue.json).includes('"password"'))
 
   const approve = await call('/api/admin/verification', { method: 'POST', cookieKey: 'admin', body: { userId: queued?._id, action: 'approve' } })
-  check('admin approves application', approve.status === 200 && approve.json.agent?.agentVerificationStatus === 'VERIFIED', `status ${approve.status} ${JSON.stringify(approve.json).slice(0, 140)}`)
+  check('admin approves application', approve.status === 200 && approve.json.landlord?.landlordVerificationStatus === 'VERIFIED', `status ${approve.status} ${JSON.stringify(approve.json).slice(0, 140)}`)
 
-  const verified = await call('/api/agent/onboarding')
-  check('agent sees VERIFIED status', verified.json.user?.agentVerificationStatus === 'VERIFIED' && verified.json.canSubmit === false, `status=${verified.json.user?.agentVerificationStatus} canSubmit=${verified.json.canSubmit}`)
+  const verified = await call('/api/landlord/onboarding')
+  check('landlord sees VERIFIED status', verified.json.user?.landlordVerificationStatus === 'VERIFIED' && verified.json.canSubmit === false, `status=${verified.json.user?.landlordVerificationStatus} canSubmit=${verified.json.canSubmit}`)
 
-  const overview = await call('/api/agent/overview')
-  check('agent workspace loads with metrics', overview.status === 200 && typeof overview.json.metrics?.activeListings === 'number', `status ${overview.status} metrics=${JSON.stringify(overview.json.metrics)}`)
-  check('workspace echoes company + states', overview.json.agent?.agentCompanyName === 'Test Homes Ltd' && (overview.json.agent?.agentStatesServed ?? []).includes('Bayelsa'))
+  const overview = await call('/api/landlord/overview')
+  check('landlord workspace loads with metrics', overview.status === 200 && typeof overview.json.metrics?.activeListings === 'number', `status ${overview.status} metrics=${JSON.stringify(overview.json.metrics)}`)
+  check('workspace echoes company + states', overview.json.landlord?.landlordCompanyName === 'Test Homes Ltd' && (overview.json.landlord?.landlordStatesServed ?? []).includes('Bayelsa'))
 
   // --- Listing creation flow ---
-  const anonListing = await call('/api/agent/properties', { method: 'POST', cookieKey: 'anon', body: { title: 'Should not work' } })
+  const anonListing = await call('/api/landlord/properties', { method: 'POST', cookieKey: 'anon', body: { title: 'Should not work' } })
   check('anonymous listing creation blocked', anonListing.status === 401, `status ${anonListing.status}`)
 
-  const badListing = await call('/api/agent/properties', { method: 'POST', body: { title: 'No', description: 'too short', type: 'apartment', price: 10, address: 'x', city: '', bedrooms: 1, bathrooms: 1, squareMeters: 10 } })
+  const badListing = await call('/api/landlord/properties', { method: 'POST', body: { title: 'No', description: 'too short', type: 'apartment', price: 10, address: 'x', city: '', bedrooms: 1, bathrooms: 1, squareMeters: 10 } })
   check('invalid listing payload rejected', badListing.status === 400, `status ${badListing.status} error=${badListing.json.error}`)
 
-  const listing = await call('/api/agent/properties', {
+  const listing = await call('/api/landlord/properties', {
     method: 'POST',
     body: {
       title: 'E2E Map-Pinned Apartment',
@@ -100,10 +100,10 @@ const main = async () => {
     },
   })
   check('listing created with map coordinates', listing.status === 201 && listing.json.property?.location?.coordinates?.lat === 4.9267, `status ${listing.status} ${JSON.stringify(listing.json).slice(0, 160)}`)
-  check('listing owned by agent + NGN', listing.json.property?.agentId && listing.json.property?.currency === 'NGN', `agentId=${listing.json.property?.agentId}`)
+  check('listing owned by landlord + NGN', listing.json.property?.landlordId && listing.json.property?.currency === 'NGN', `landlordId=${listing.json.property?.landlordId}`)
 
-  const myListings = await call('/api/agent/properties')
-  check('listing appears in agent workspace list', myListings.status === 200 && (myListings.json.properties ?? []).some((item) => item.title === 'E2E Map-Pinned Apartment'), `status ${myListings.status} count=${(myListings.json.properties ?? []).length}`)
+  const myListings = await call('/api/landlord/properties')
+  check('listing appears in landlord workspace list', myListings.status === 200 && (myListings.json.properties ?? []).some((item) => item.title === 'E2E Map-Pinned Apartment'), `status ${myListings.status} count=${(myListings.json.properties ?? []).length}`)
 
   const publicListings = await call('/api/properties')
   check('published listing visible on public discover API', (publicListings.json.items ?? []).some((item) => item.title === 'E2E Map-Pinned Apartment'), `status ${publicListings.status} count=${(publicListings.json.items ?? []).length}`)
@@ -111,54 +111,54 @@ const main = async () => {
   // --- Notifications: admins get notified of new applications + listings ---
   const adminNotifs = await call('/api/notifications', { cookieKey: 'admin' })
   const adminNotificationTypes = (adminNotifs.json.items ?? []).map((item) => item.type)
-  check('admin notified about new agent application', adminNotificationTypes.includes('AGENT_APPLICATION'), `types=${adminNotificationTypes.join(',')}`)
+  check('admin notified about new landlord application', adminNotificationTypes.includes('LANDLORD_APPLICATION'), `types=${adminNotificationTypes.join(',')}`)
   check('admin notified about newly published listing', adminNotificationTypes.includes('LISTING_PUBLISHED'), `types=${adminNotificationTypes.join(',')}`)
   check('admin notification has unread count', adminNotifs.json.unread >= 2, `unread=${adminNotifs.json.unread}`)
 
   // --- Review persistence (from refresh) ---
   await call('/api/auth', { method: 'POST', cookieKey: 'renter', body: { action: 'signup', name: 'Renter User', email: `e2e-renter-${stamp}@olivtest.ng`, password: 'Renter2026!' } })
-  const review = await call('/api/reviews', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, rating: 5, text: 'E2E review — excellent location and very responsive agent.' } })
+  const review = await call('/api/reviews', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, rating: 5, text: 'E2E review — excellent location and very responsive landlord.' } })
   check('review submission saved to database', review.status === 201 && review.json.review?.status === 'PUBLISHED', `status ${review.status} ${JSON.stringify(review.json).slice(0, 140)}`)
   const reloadedReviews = await call(`/api/reviews?propertyId=${listing.json.property?._id}`)
   check('review reloads from database', (reloadedReviews.json.items ?? []).some((item) => item.text?.includes('E2E review')), `count=${(reloadedReviews.json.items ?? []).length}`)
   const globalReviews = await call('/api/reviews')
   check('review visible in global store (survives refresh)', (globalReviews.json.items ?? []).some((item) => item.text?.includes('E2E review')), `count=${(globalReviews.json.items ?? []).length}`)
-  // Agent should now have a REVIEW_RECEIVED notification (review was from a different user).
-  const agentNotifsAfterReview = await call('/api/notifications')
-  const reviewNotification = (agentNotifsAfterReview.json.items ?? []).find((item) => item.type === 'REVIEW_RECEIVED')
-  check('agent notified about new review', Boolean(reviewNotification) && (reviewNotification.title ?? '').includes('review'), `type=${reviewNotification?.type} title=${reviewNotification?.title}`)
-  check('agent notification unread badge reflects count', agentNotifsAfterReview.json.unread >= 1, `unread=${agentNotifsAfterReview.json.unread}`)
+  // Landlord should now have a REVIEW_RECEIVED notification (review was from a different user).
+  const landlordNotifsAfterReview = await call('/api/notifications')
+  const reviewNotification = (landlordNotifsAfterReview.json.items ?? []).find((item) => item.type === 'REVIEW_RECEIVED')
+  check('landlord notified about new review', Boolean(reviewNotification) && (reviewNotification.title ?? '').includes('review'), `type=${reviewNotification?.type} title=${reviewNotification?.title}`)
+  check('landlord notification unread badge reflects count', landlordNotifsAfterReview.json.unread >= 1, `unread=${landlordNotifsAfterReview.json.unread}`)
 
-  // --- Agent dashboard inbox + responding ---
+  // --- Landlord dashboard inbox + responding ---
   const requestForListing = await call('/api/requests', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, type: 'VIEWING', preferredDate: new Date(Date.now() + 1000 * 60 * 60 * 72).toISOString(), preferredTime: 'Afternoon' } })
   check('renter booking request created', requestForListing.status === 200, `status ${requestForListing.status} ${JSON.stringify(requestForListing.json)}`)
-  const agentNotifsAfterBooking = await call('/api/notifications')
-  check('agent notified about new viewing request', (agentNotifsAfterBooking.json.items ?? []).some((item) => item.type === 'VIEWING_REQUEST'), `types=${(agentNotifsAfterBooking.json.items ?? []).map((item) => item.type).join(',')}`)
-  const inboxAfter = await call('/api/agent/requests')
+  const landlordNotifsAfterBooking = await call('/api/notifications')
+  check('landlord notified about new viewing request', (landlordNotifsAfterBooking.json.items ?? []).some((item) => item.type === 'VIEWING_REQUEST'), `types=${(landlordNotifsAfterBooking.json.items ?? []).map((item) => item.type).join(',')}`)
+  const inboxAfter = await call('/api/landlord/requests')
   const inboxItem = (inboxAfter.json.items ?? []).find((item) => item.propertyId === listing.json.property?._id && item.type === 'VIEWING')
-  check('agent sees the booking with property + renter info', Boolean(inboxItem) && Boolean(inboxItem.userName) && Boolean(inboxItem.propertyTitle), `title=${inboxItem?.propertyTitle} user=${inboxItem?.userName}`)
-  const confirm = await call('/api/agent/requests', { method: 'PATCH', body: { requestId: inboxItem?._id ?? '', action: 'CONFIRM' } })
-  check('agent confirms the viewing', confirm.status === 200 && confirm.json.request?.status === 'CONFIRMED', `status ${confirm.status} ${JSON.stringify(confirm.json).slice(0, 120)}`)
+  check('landlord sees the booking with property + renter info', Boolean(inboxItem) && Boolean(inboxItem.userName) && Boolean(inboxItem.propertyTitle), `title=${inboxItem?.propertyTitle} user=${inboxItem?.userName}`)
+  const confirm = await call('/api/landlord/requests', { method: 'PATCH', body: { requestId: inboxItem?._id ?? '', action: 'CONFIRM' } })
+  check('landlord confirms the viewing', confirm.status === 200 && confirm.json.request?.status === 'CONFIRMED', `status ${confirm.status} ${JSON.stringify(confirm.json).slice(0, 120)}`)
   const renterNotifsAfterConfirm = await call('/api/notifications', { cookieKey: 'renter' })
   check('renter notified when viewing is confirmed', (renterNotifsAfterConfirm.json.items ?? []).some((item) => item.type === 'VIEWING_CONFIRMED'), `types=${(renterNotifsAfterConfirm.json.items ?? []).map((item) => item.type).join(',')}`)
-  const strangerReject = await call('/api/agent/requests', { method: 'PATCH', cookieKey: 'renter', body: { requestId: inboxItem?._id ?? '', action: 'CANCEL' } })
-  check('non-agent cannot update a request', strangerReject.status === 403, `status ${strangerReject.status}`)
+  const strangerReject = await call('/api/landlord/requests', { method: 'PATCH', cookieKey: 'renter', body: { requestId: inboxItem?._id ?? '', action: 'CANCEL' } })
+  check('non-landlord cannot update a request', strangerReject.status === 403, `status ${strangerReject.status}`)
 
   // --- Inquiry reply flow notifies the renter ---
   const inquiry = await call('/api/requests', { method: 'POST', cookieKey: 'renter', body: { propertyId: listing.json.property?._id, type: 'INQUIRY', message: 'Is this home still available for viewing next week?' } })
   check('renter inquiry created', inquiry.status === 200, `status ${inquiry.status} ${JSON.stringify(inquiry.json)}`)
-  const inboxWithInquiry = await call('/api/agent/requests')
+  const inboxWithInquiry = await call('/api/landlord/requests')
   const inquiryItem = (inboxWithInquiry.json.items ?? []).find((item) => item.propertyId === listing.json.property?._id && item.type === 'INQUIRY')
-  check('agent sees the inquiry', Boolean(inquiryItem), `id=${inquiryItem?._id}`)
-  const reply = await call('/api/agent/requests', { method: 'PATCH', body: { requestId: inquiryItem?._id ?? '', action: 'REPLY', reply: 'Yes, it is available. We can arrange a visit.' } })
-  check('agent replies to the inquiry', reply.status === 200 && reply.json.request?.status === 'REPLIED', `status ${reply.status} ${JSON.stringify(reply.json).slice(0, 120)}`)
+  check('landlord sees the inquiry', Boolean(inquiryItem), `id=${inquiryItem?._id}`)
+  const reply = await call('/api/landlord/requests', { method: 'PATCH', body: { requestId: inquiryItem?._id ?? '', action: 'REPLY', reply: 'Yes, it is available. We can arrange a visit.' } })
+  check('landlord replies to the inquiry', reply.status === 200 && reply.json.request?.status === 'REPLIED', `status ${reply.status} ${JSON.stringify(reply.json).slice(0, 120)}`)
   const renterNotifsAfterReply = await call('/api/notifications', { cookieKey: 'renter' })
-  check('renter notified when agent replies', (renterNotifsAfterReply.json.items ?? []).some((item) => item.type === 'INQUIRY_REPLIED'), `types=${(renterNotifsAfterReply.json.items ?? []).map((item) => item.type).join(',')}`)
+  check('renter notified when landlord replies', (renterNotifsAfterReply.json.items ?? []).some((item) => item.type === 'INQUIRY_REPLIED'), `types=${(renterNotifsAfterReply.json.items ?? []).map((item) => item.type).join(',')}`)
 
-  // --- Verification outcome notification reaches the agent ---
-  const agentNotifsBeforeMark = await call('/api/notifications')
-  const verificationNotification = (agentNotifsBeforeMark.json.items ?? []).find((item) => item.type === 'VERIFICATION_APPROVED')
-  check('agent notified when verification is approved', Boolean(verificationNotification) && (verificationNotification.body ?? '').includes('approved'), `type=${verificationNotification?.type} body=${verificationNotification?.body}`)
+  // --- Verification outcome notification reaches the landlord ---
+  const landlordNotifsBeforeMark = await call('/api/notifications')
+  const verificationNotification = (landlordNotifsBeforeMark.json.items ?? []).find((item) => item.type === 'VERIFICATION_APPROVED')
+  check('landlord notified when verification is approved', Boolean(verificationNotification) && (verificationNotification.body ?? '').includes('approved'), `type=${verificationNotification?.type} body=${verificationNotification?.body}`)
 
   // --- Mark-notifications-read flow ---
   const markRead = await call('/api/notifications', { method: 'POST', body: { all: true } })
@@ -166,13 +166,13 @@ const main = async () => {
   const unreadAfterMark = await call('/api/notifications')
   check('unread count drops to zero after mark-all-read', unreadAfterMark.json.unread === 0, `unread=${unreadAfterMark.json.unread}`)
 
-  // --- Agent profile settings ---
-  const profileUpdate = await call('/api/agent/profile', { method: 'PATCH', body: { companyName: 'Test Homes Ltd (updated)', bio: 'Updated bio from the E2E settings flow.', statesServed: ['Bayelsa', 'Rivers', 'Lagos'] } })
-  check('agent settings update saved', profileUpdate.status === 200 && (profileUpdate.json.agent?.agentCompanyName ?? '').includes('updated'), `status ${profileUpdate.status}`)
-  const overviewAfter = await call('/api/agent/overview')
-  check('settings reflected in workspace', (overviewAfter.json.agent?.agentCompanyName ?? '').includes('updated') && (overviewAfter.json.agent?.agentStatesServed ?? []).includes('Lagos'))
-  const agentReviews = await call('/api/agent/reviews')
-  check('agent review inbox lists the review', (agentReviews.json.reviews ?? []).some((item) => item.text?.includes('E2E review')), `count=${(agentReviews.json.reviews ?? []).length}`)
+  // --- Landlord profile settings ---
+  const profileUpdate = await call('/api/landlord/profile', { method: 'PATCH', body: { companyName: 'Test Homes Ltd (updated)', bio: 'Updated bio from the E2E settings flow.', statesServed: ['Bayelsa', 'Rivers', 'Lagos'] } })
+  check('landlord settings update saved', profileUpdate.status === 200 && (profileUpdate.json.landlord?.landlordCompanyName ?? '').includes('updated'), `status ${profileUpdate.status}`)
+  const overviewAfter = await call('/api/landlord/overview')
+  check('settings reflected in workspace', (overviewAfter.json.landlord?.landlordCompanyName ?? '').includes('updated') && (overviewAfter.json.landlord?.landlordStatesServed ?? []).includes('Lagos'))
+  const landlordReviews = await call('/api/landlord/reviews')
+  check('landlord review inbox lists the review', (landlordReviews.json.reviews ?? []).some((item) => item.text?.includes('E2E review')), `count=${(landlordReviews.json.reviews ?? []).length}`)
 
   const uploadWithoutKeys = await call('/api/upload', { method: 'POST' })
   check('upload endpoint reports config state cleanly', [503, 400].includes(uploadWithoutKeys.status) || uploadWithoutKeys.status === 201, `status ${uploadWithoutKeys.status} error=${uploadWithoutKeys.json.error ?? 'configured'}`)

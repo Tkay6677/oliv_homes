@@ -9,7 +9,7 @@ export function ensureOlivIndexes(db: Db) {
       db.collection('properties').createIndex({ published: 1, type: 1, price: 1 }),
       db.collection('users').createIndex({ email: 1 }, { unique: true }),
       db.collection('savedProperties').createIndex({ userId: 1, propertyId: 1 }, { unique: true }),
-      db.collection('viewingRequests').createIndex({ agentId: 1, status: 1, preferredDate: 1 }),
+      db.collection('viewingRequests').createIndex({ landlordId: 1, status: 1, preferredDate: 1 }),
       db.collection('notifications').createIndex({ recipientId: 1, readAt: 1, createdAt: -1 }),
       db.collection('reviews').createIndex({ propertyId: 1, status: 1, createdAt: -1 }),
       db.collection('reports').createIndex({ status: 1, createdAt: -1 }),
